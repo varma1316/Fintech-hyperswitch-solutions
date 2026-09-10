@@ -1,0 +1,116 @@
+@react.component
+let make = (~selectedTransformationHistoryId: option<string>) => {
+  open LogicUtils
+  open ReconEngineDataTransformedEntriesUtils
+  open ReconEngineHooks
+  open ReconEngineDataTransformedEntriesTypes
+
+  let {
+    updateExistingKeys,
+    filterValueJson,
+    filterValue,
+    filterKeys,
+    setfilterKeys,
+  } = React.useContext(FilterContext.filterContext)
+  let globalDateFilters = ReconEngineAtoms.globalDateFiltersAtom->Recoil.useRecoilValueFromAtom
+  let filterValueJsonWithGlobalDate = ReconEngineFilterUtils.mergeGlobalDateFilters(
+    ~filterValueJson,
+    ~globalDateFilters,
+  )
+  let (screenState, setScreenState) = React.useState(_ => PageLoaderWrapper.Loading)
+  let (stagingOverviewData, setStagingOverviewData) = React.useState(_ => [])
+  let (activeView: transformedEntriesViewType, setActiveView) = React.useState(_ =>
+    UnknownTransformedEntriesViewType
+  )
+  let getStagingEntriesOverview = useGetStagingEntriesOverview()
+
+  let customFilterKey = "status"
+  let startTime = filterValueJsonWithGlobalDate->getString("startTime", "")
+  let endTime = filterValueJsonWithGlobalDate->getString("endTime", "")
+
+  let updateViewsFilterValue = (view: transformedEntriesViewType) => {
+    let statusFilter = view->getViewStatusFilter
+    if statusFilter->isNonEmptyString {
+      let customFilter = `[${statusFilter}]`
+      updateExistingKeys(Dict.fromArray([(customFilterKey, customFilter)]))
+
+      if !(filterKeys->Array.includes(customFilterKey)) {
+        filterKeys->Array.push(customFilterKey)
+        setfilterKeys(_ => filterKeys)
+      }
+    }
+  }
+
+  let onViewClick = (view: transformedEntriesViewType) => {
+    setActiveView(_ => view)
+    updateViewsFilterValue(view)
+  }
+
+  let fetchStagingData = async () => {
+    try {
+      setScreenState(_ => PageLoaderWrapper.Loading)
+      let queryFiltersDict = Dict.make()
+      if startTime->isNonEmptyString {
+        queryFiltersDict->Dict.set("startTime", startTime->JSON.Encode.string)
+      }
+      if endTime->isNonEmptyString {
+        queryFiltersDict->Dict.set("endTime", endTime->JSON.Encode.string)
+      }
+      selectedTransformationHistoryId
+      ->Option.filter(isNonEmptyString)
+      ->Option.forEach(id =>
+        queryFiltersDict->Dict.set("transformation_history_ids", id->JSON.Encode.string)
+      )
+      let queryString = ReconEngineFilterUtils.buildQueryStringFromFilters(
+        ~filterValueJson=queryFiltersDict,
+      )
+      let stagingOverview = await getStagingEntriesOverview(
+        ~queryParameters=queryString->isNonEmptyString ? Some(queryString) : None,
+      )
+
+      setStagingOverviewData(_ => stagingOverview)
+      setScreenState(_ => PageLoaderWrapper.Success)
+    } catch {
+    | _ => setScreenState(_ => PageLoaderWrapper.Custom)
+    }
+  }
+
+  let settingActiveView = () => {
+    let appliedStatusArray =
+      filterValueJson->getArrayFromDict(customFilterKey, [])->getStrArrayFromJsonArray
+    setActiveView(_ => appliedStatusArray->getViewTypeFromStatusFilter)
+  }
+
+  React.useEffect(() => {
+    if startTime->isNonEmptyString {
+      fetchStagingData()->ignore
+    }
+    None
+  }, (startTime, endTime, selectedTransformationHistoryId))
+
+  React.useEffect(() => {
+    settingActiveView()
+    None
+  }, [filterValue])
+
+  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mt-2">
+    {cardDetails(~stagingOverviewData)
+    ->Array.map(card => {
+      let isClickable = card.viewType !== UnknownTransformedEntriesViewType
+      let isActive = isClickable && card.viewType === activeView
+      <PageLoaderWrapper
+        key={randomString(~length=10)}
+        screenState
+        customUI={<NewAnalyticsHelper.NoData height="h-28" message="No data available" />}
+        customLoader={<Shimmer styleClass="w-full h-28 rounded-xl" />}>
+        <ReconEngineDataTransformedEntriesHelper.TransformedEntriesOverviewCard
+          title={card.title}
+          value={card.value}
+          onClick={isClickable ? Some(() => onViewClick(card.viewType)) : None}
+          isActive={isActive}
+        />
+      </PageLoaderWrapper>
+    })
+    ->React.array}
+  </div>
+}

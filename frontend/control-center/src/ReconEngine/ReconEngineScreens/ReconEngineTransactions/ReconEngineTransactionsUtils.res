@@ -1,0 +1,876 @@
+open LogicUtils
+open ReconEngineFilterUtils
+open ReconEngineTypes
+open ReconEngineUtils
+open ReconEngineTransactionsTypes
+
+let searchTypeFromString = str => {
+  switch str {
+  | "order_id" => SearchOrderId
+  | "transaction_id" => SearchTransactionId
+  | _ => UnknownTransactionSearchType
+  }
+}
+
+let searchTypeOptions: array<SearchInput.searchTypeOption> = [
+  SearchTransactionId,
+  SearchOrderId,
+]->Array.map((txnType): SearchInput.searchTypeOption => {
+  {
+    label: (txnType :> string)->snakeToTitle,
+    value: (txnType :> string),
+  }
+})
+
+let entrySearchTypeFromString = str => {
+  switch str {
+  | "order_ids" => SearchEntryOrderId
+  | "staging_entry_ids" => SearchEntryStagingEntryId
+  | _ => UnknownEntrySearchType
+  }
+}
+
+let entrySearchTypeOptions: array<SearchInput.searchTypeOption> = [
+  (SearchEntryOrderId, "Order ID"),
+  (SearchEntryStagingEntryId, "Staging Entry ID"),
+]->Array.map(((searchType, label)): SearchInput.searchTypeOption => {
+  {
+    label,
+    value: (searchType :> string),
+  }
+})
+
+let getSortOrder = (sortOb: LoadedTable.sortOb): transactionSortOrder => {
+  sortOb.sortKey === "date" && sortOb.sortType === LoadedTable.ASC ? Asc : Desc
+}
+
+let allTransactionStatuses: array<domainTransactionStatus> = [
+  Expected,
+  Missing,
+  OverAmount(Mismatch),
+  UnderAmount(Mismatch),
+  OverAmount(Expected),
+  UnderAmount(Expected),
+  Posted(Manual),
+  Matched(Auto),
+  Matched(Manual),
+  Matched(WithTolerance),
+  Matched(Force),
+  Void,
+  PartiallyReconciled,
+  DataMismatch,
+  SplitMismatch,
+  CurrencyMismatch,
+]
+
+let getEffectiveStatusValues = (~filterValueJson: Dict.t<JSON.t>): array<string> => {
+  let statusFilter = filterValueJson->getArrayFromDict("status", [])
+  let finalStatusFilter = getMergedMatchedTransactionStatusFilter(statusFilter)
+  finalStatusFilter->isEmptyArray
+    ? getTransactionStatusValueFromStatusList(allTransactionStatuses)
+    : finalStatusFilter->Array.map(v => v->getStringFromJson(""))
+}
+
+let buildTransactionsV2Body = (
+  ~filterValueJson: Dict.t<JSON.t>,
+  ~searchType: transactionSearchType,
+  ~searchText: string,
+  ~ruleId: string,
+  ~sortBy: cursor,
+  ~direction: cursorDirection,
+  ~order: transactionSortOrder=Desc,
+  ~limit=4,
+  ~includeStatusFilter=true,
+) => {
+  let statusValues = getEffectiveStatusValues(~filterValueJson)
+
+  let startTime = filterValueJson->getString("startTime", "")->toReconTimeString
+  let endTime = filterValueJson->getString("endTime", "")->toReconTimeString
+  let hasStartTime = startTime->isNonEmptyString
+  let hasEndTime = endTime->isNonEmptyString
+  let hasBothTimeRanges = hasStartTime && hasEndTime
+  let filters =
+    [
+      ruleId->isNonEmptyString ? Some(("rule_id", ruleId->JSON.Encode.string)) : None,
+      includeStatusFilter ? Some(("status", statusValues->getJsonFromArrayOfString)) : None,
+      if hasBothTimeRanges {
+        Some((
+          "time_range",
+          [
+            ("start_time", startTime->JSON.Encode.string),
+            ("end_time", endTime->JSON.Encode.string),
+          ]->getJsonFromArrayOfJson,
+        ))
+      } else if hasStartTime {
+        Some((
+          "time_range",
+          [("start_time", startTime->JSON.Encode.string)]->getJsonFromArrayOfJson,
+        ))
+      } else {
+        None
+      },
+      searchText->isNonEmptyString
+        ? Some(((searchType :> string), searchText->String.trim->JSON.Encode.string))
+        : None,
+    ]
+    ->Array.filterMap(entry => entry)
+    ->getJsonFromArrayOfJson
+
+  let cursorPayload: transactionsV2CursorPayload = {
+    limit,
+    direction,
+    order,
+    sortBy,
+  }
+
+  [
+    ("filters", filters),
+    ("cursor_payload", cursorPayload->Identity.genericTypeToJson),
+  ]->getJsonFromArrayOfJson
+}
+
+let allEntryFilterStatuses: array<entryStatus> = [
+  Posted,
+  Matched,
+  Mismatched,
+  Expected,
+  Pending,
+  Void,
+  Archived,
+]
+
+let getCurrencyOptionsFromAccounts = (
+  accountsData: array<accountType>,
+  ~accountIds: array<string>,
+): array<FilterSelectBox.dropdownOption> => {
+  accountsData
+  ->Array.filter(account => accountIds->Array.includes(account.account_id))
+  ->Array.map(account => account.currency)
+  ->Array.filter(isNonEmptyString)
+  ->getUniqueArray
+  ->Array.map(currency => {
+    {
+      FilterSelectBox.label: currency,
+      value: currency,
+    }
+  })
+}
+
+let entriesDisplayFilters = (~currencyOptions, ~transformationConfigOptions) => {
+  let entryTypeOptions: array<FilterSelectBox.dropdownOption> = [
+    {label: "Credit", value: "credit"},
+    {label: "Debit", value: "debit"},
+  ]
+
+  let statusOptions = allEntryFilterStatuses->Array.map((
+    status
+  ): FilterSelectBox.dropdownOption => {
+    label: (status :> string)->snakeToTitle,
+    value: (status :> string),
+  })
+
+  [
+    (
+      {
+        field: FormRenderer.makeFieldInfo(
+          ~label="entry_type",
+          ~name="entry_type",
+          ~customInput=InputFields.filterMultiSelectInput(
+            ~options=entryTypeOptions,
+            ~buttonText="Select Entry Type",
+            ~showSelectionAsChips=false,
+            ~searchable=true,
+            ~showToolTip=true,
+            ~showNameAsToolTip=true,
+            ~customButtonStyle="bg-none",
+            ~fixedDropDownDirection=BottomRight,
+            (),
+          ),
+        ),
+        localFilter: Some((_, _) => []->Array.map(Nullable.make)),
+      }: EntityType.initialFilters<'t>
+    ),
+    (
+      {
+        field: FormRenderer.makeFieldInfo(
+          ~label="status",
+          ~name="status",
+          ~customInput=InputFields.filterMultiSelectInput(
+            ~options=statusOptions,
+            ~buttonText="Select Status",
+            ~showSelectionAsChips=false,
+            ~searchable=true,
+            ~showToolTip=true,
+            ~showNameAsToolTip=true,
+            ~customButtonStyle="bg-none",
+            ~fixedDropDownDirection=BottomRight,
+            (),
+          ),
+        ),
+        localFilter: Some((_, _) => []->Array.map(Nullable.make)),
+      }: EntityType.initialFilters<'t>
+    ),
+    (
+      {
+        field: FormRenderer.makeFieldInfo(
+          ~label="currency",
+          ~name="currency",
+          ~customInput=InputFields.filterMultiSelectInput(
+            ~options=currencyOptions,
+            ~buttonText="Select Currency",
+            ~showSelectionAsChips=false,
+            ~searchable=true,
+            ~showToolTip=true,
+            ~showNameAsToolTip=true,
+            ~customButtonStyle="bg-none",
+            ~fixedDropDownDirection=BottomRight,
+            (),
+          ),
+        ),
+        localFilter: Some((_, _) => []->Array.map(Nullable.make)),
+      }: EntityType.initialFilters<'t>
+    ),
+    (
+      {
+        field: FormRenderer.makeFieldInfo(
+          ~label="transformation_config_ids",
+          ~name="transformation_config_ids",
+          ~customInput=InputFields.filterMultiSelectInput(
+            ~options=transformationConfigOptions,
+            ~buttonText="Select Transformation",
+            ~showSelectionAsChips=false,
+            ~searchable=true,
+            ~showToolTip=true,
+            ~showNameAsToolTip=true,
+            ~customButtonStyle="bg-none",
+            ~fixedDropDownDirection=BottomRight,
+            (),
+          ),
+        ),
+        localFilter: Some((_, _) => []->Array.map(Nullable.make)),
+      }: EntityType.initialFilters<'t>
+    ),
+  ]
+}
+
+let buildEntriesListBody = (
+  ~primaryTransactionId: string,
+  ~accountIds: array<string>,
+  ~sortBy: cursor,
+  ~direction: cursorDirection,
+  ~filterValueJson: Dict.t<JSON.t>,
+  ~searchType: entrySearchType,
+  ~searchText: string,
+  ~limit=10,
+) => {
+  let filtersDict = Dict.make()
+  filtersDict->Dict.set("primary_transaction_id", primaryTransactionId->JSON.Encode.string)
+  filtersDict->setOptionArray(
+    "account_ids",
+    accountIds->Array.map(JSON.Encode.string)->getNonEmptyArray,
+  )
+
+  let getSelectedValues = key =>
+    filterValueJson
+    ->getArrayFromDict(key, [])
+    ->Array.map(value => value->getStringFromJson(""))
+    ->Array.filter(isNonEmptyString)
+
+  filtersDict->setOptionArray(
+    "status",
+    getSelectedValues("status")->Array.map(JSON.Encode.string)->getNonEmptyArray,
+  )
+  filtersDict->setOptionArray(
+    "currency",
+    getSelectedValues("currency")->Array.map(JSON.Encode.string)->getNonEmptyArray,
+  )
+  filtersDict->setOptionArray(
+    "transformation_config_ids",
+    getSelectedValues("transformation_config_ids")->Array.map(JSON.Encode.string)->getNonEmptyArray,
+  )
+
+  switch getSelectedValues("entry_type") {
+  | [entryType] => filtersDict->Dict.set("entry_type", entryType->JSON.Encode.string)
+  | _ => ()
+  }
+
+  let trimmedSearchText = searchText->String.trim
+  if trimmedSearchText->isNonEmptyString && searchType != UnknownEntrySearchType {
+    filtersDict->Dict.set((searchType :> string), [trimmedSearchText]->getJsonFromArrayOfString)
+  }
+
+  let cursorPayload: entriesListCursorPayload = {
+    limit,
+    direction,
+    order: Desc,
+    sortBy,
+  }
+
+  [
+    ("filters", filtersDict->JSON.Encode.object),
+    ("cursor_payload", cursorPayload->Identity.genericTypeToJson),
+  ]->getJsonFromArrayOfJson
+}
+
+let buildTransactionBulkSelectionFilters = (~filterValueJson: Dict.t<JSON.t>, ~ruleId: string) => {
+  let statusValues = getEffectiveStatusValues(~filterValueJson)
+  let startTime = filterValueJson->getString("startTime", "")->toReconTimeString
+  let endTime = filterValueJson->getString("endTime", "")->toReconTimeString
+
+  [
+    ruleId->isNonEmptyString ? Some(("rule_id", ruleId->JSON.Encode.string)) : None,
+    Some(("status", statusValues->Array.joinWith(",")->JSON.Encode.string)),
+    startTime->isNonEmptyString ? Some(("start_time", startTime->JSON.Encode.string)) : None,
+    endTime->isNonEmptyString ? Some(("end_time", endTime->JSON.Encode.string)) : None,
+  ]
+  ->Array.filterMap(entry => entry)
+  ->getJsonFromArrayOfJson
+}
+
+let getTransactionStatusLabels = (statusValues: array<string>) => {
+  statusValues->Array.filterMap(value => {
+    let (_, label, _) =
+      value->overviewTransactionStatusTypeFromString->getTransactionStatusGroupedValueAndLabel
+    label->getNonEmptyString
+  })
+}
+
+let buildSelectionFilterScopeText = (
+  ~userSelectedFilterValueJson: Dict.t<JSON.t>,
+): filterScopeCopy => {
+  let selectedStatuses =
+    userSelectedFilterValueJson
+    ->getArrayFromDict("status", [])
+    ->Array.map(v => v->getStringFromJson(""))
+
+  if selectedStatuses->isEmptyArray {
+    {
+      optionLabel: "All exceptions, including those on other pages",
+      optionDescription: "Applies to every exception listed for this rule",
+    }
+  } else {
+    {
+      optionLabel: "All transactions with the selected statuses, including those on other pages",
+      optionDescription: `Applies to: ${selectedStatuses
+        ->getTransactionStatusLabels
+        ->Array.joinWith(", ")}`,
+    }
+  }
+}
+
+let constructTransactionBulkRequestBody = (
+  ~bulkActionType: actionType,
+  ~valuesDict,
+  ~selection: transactionBulkSelection,
+) => {
+  let postAction =
+    [
+      (
+        "manual_post",
+        [
+          ("reason", valuesDict->getString("reason", "")->JSON.Encode.string),
+        ]->getJsonFromArrayOfJson,
+      ),
+    ]->getJsonFromArrayOfJson
+
+  let voidAction =
+    [
+      (
+        "void",
+        [
+          ("reason", valuesDict->getString("reason", "")->JSON.Encode.string),
+        ]->getJsonFromArrayOfJson,
+      ),
+    ]->getJsonFromArrayOfJson
+
+  let action = switch bulkActionType {
+  | BulkTransactionPost => postAction
+  | BulkTransactionVoid => voidAction
+  | UnknownBulkTransactionActionType => JSON.Encode.null
+  }
+
+  let selectionJson = switch selection {
+  | SelectionByIds(rows) =>
+    [
+      ("selection_type", (ByIds :> string)->JSON.Encode.string),
+      (
+        "ids",
+        rows->Array.map((txn: transactionType) => txn.id->JSON.Encode.string)->JSON.Encode.array,
+      ),
+    ]->getJsonFromArrayOfJson
+  | SelectionByFilters(filters) =>
+    [
+      ("selection_type", (ByFilters :> string)->JSON.Encode.string),
+      ("filters", filters),
+    ]->getJsonFromArrayOfJson
+  }
+
+  [("action", action), ("selection", selectionJson)]->getJsonFromArrayOfJson
+}
+
+let getTransactionBulkActionsCount = (
+  ~bulkActionResponses: array<ReconEngineExceptionsTypes.bulkActionResponse>,
+) => {
+  bulkActionResponses->Array.reduce((0, 0, 0, 0), (acc, response) => {
+    let (successCount, failedCount, skippedCount, totalCount) = acc
+    switch response.bulk_action_status {
+    | BulkActionSuccess => (successCount + 1, failedCount, skippedCount, totalCount + 1)
+    | BulkActionFailed => (successCount, failedCount + 1, skippedCount, totalCount + 1)
+    | BulkActionInEligible => (successCount, failedCount, skippedCount + 1, totalCount + 1)
+    | UnknownBulkActionStatus => (successCount, failedCount, skippedCount, totalCount + 1)
+    }
+  })
+}
+
+let entriesMetadataKeyToString = key => {
+  switch key {
+  | Amount => "amount"
+  | Currency => "currency"
+  }
+}
+
+let entriesMetadataExcludedKeys = [Amount, Currency]->Array.map(entriesMetadataKeyToString)
+
+let getFilteredMetadataFromEntries = metadata => {
+  metadata
+  ->getDictFromJsonObject
+  ->Dict.toArray
+  ->Array.filter(((key, _value)) => {
+    !Array.includes(entriesMetadataExcludedKeys, key)
+  })
+  ->Dict.fromArray
+}
+
+let getHeadersForCSV = () => {
+  "Order ID,Transaction ID,Payment Gateway,Payment Method,Txn Amount,Settlement Amount,Recon Status,Transaction Date"
+}
+
+let getTransactionsPayloadFromDict = dict => {
+  dict->transactionItemToObjMapper
+}
+
+let transactionsEntryItemToObjMapperFromDict = dict => {
+  dict->entryItemToObjMapper
+}
+
+let sortByVersion = (c1: transactionType, c2: transactionType) => {
+  compareLogic(c1.version, c2.version)
+}
+
+let getAccounts = (entries: array<transactionEntryType>, entryType: entryDirectionType): string => {
+  let accounts =
+    entries
+    ->Array.filter(entry => entry.entry_type === entryType)
+    ->Array.map(entry => entry.account.account_name)
+
+  let uniqueAccounts = accounts->Array.reduce([], (acc, accountName) => {
+    if Array.includes(acc, accountName) {
+      acc
+    } else {
+      Array.concat(acc, [accountName])
+    }
+  })
+
+  uniqueAccounts->Array.joinWith(", ")
+}
+
+let getTransactionFlowType = (
+  ~transaction: transactionType,
+  ~reconRulesList: array<ReconEngineRulesTypes.rulePayload>,
+  ~accountData: array<accountType>,
+): transactionFlowType => {
+  switch reconRulesList->Array.find(rule => rule.rule_id === transaction.rule.rule_id) {
+  | None => UnknownTransactionFlowType
+  | Some(rule) =>
+    let (_, targetAccounts) = ReconEngineRulesUtils.getSourceAndTargetAccountDetails(rule.strategy)
+
+    let resolvedTargetAccounts =
+      targetAccounts->Array.filterMap(targetAccount =>
+        accountData->Array.find(account => account.account_id === targetAccount.account_id)
+      )
+
+    let netInflowAmount = resolvedTargetAccounts->Array.reduce(0.0, (netAcc, account) => {
+      let (creditSum, debitSum) =
+        transaction.entries
+        ->Array.filter(entry => entry.account.account_id === account.account_id)
+        ->Array.reduce((0.0, 0.0), ((creditSum, debitSum), entry) => {
+          switch entry.entry_type {
+          | Credit => (creditSum +. entry.amount.value, debitSum)
+          | Debit => (creditSum, debitSum +. entry.amount.value)
+          | UnknownEntryDirectionType => (creditSum, debitSum)
+          }
+        })
+      switch account.account_type {
+      | Debit => netAcc +. (debitSum -. creditSum)
+      | Credit => netAcc +. (creditSum -. debitSum)
+      | UnknownAccountTypeVariant => netAcc
+      }
+    })
+    netInflowAmount > 0.0 ? InFlow : OutFlow
+  }
+}
+
+let statusDisplayFilters = (): array<EntityType.initialFilters<'t>> => {
+  let statusOptions = getGroupedTransactionStatusOptions([
+    Posted(Manual),
+    Matched(Auto),
+    Matched(Manual),
+    Matched(WithTolerance),
+    OverAmount(Mismatch),
+    OverAmount(Expected),
+    UnderAmount(Mismatch),
+    UnderAmount(Expected),
+    DataMismatch,
+    CurrencyMismatch,
+    SplitMismatch,
+    PartiallyReconciled,
+    Expected,
+    Missing,
+    Void,
+  ])
+
+  [
+    {
+      field: FormRenderer.makeFieldInfo(
+        ~label="transaction_status",
+        ~name="status",
+        ~customInput=InputFields.filterMultiSelectInput(
+          ~options=statusOptions,
+          ~buttonText="Select Transaction Status",
+          ~showSelectionAsChips=false,
+          ~searchable=true,
+          ~showToolTip=true,
+          ~showNameAsToolTip=true,
+          ~customButtonStyle="bg-none",
+          (),
+        ),
+      ),
+      localFilter: Some((_, _) => []->Array.map(Nullable.make)),
+    },
+  ]
+}
+
+let getTransactionStatusLabelColor = (status: domainTransactionStatus): TableUtils.labelColor => {
+  switch status {
+  | Posted(Manual)
+  | Matched(Force)
+  | Matched(Manual)
+  | Matched(Auto)
+  | Matched(WithTolerance) =>
+    LabelGreen
+  | OverAmount(Mismatch)
+  | UnderAmount(Mismatch)
+  | DataMismatch
+  | CurrencyMismatch
+  | SplitMismatch =>
+    LabelRed
+  | Expected | UnderAmount(Expected) | OverAmount(Expected) => LabelBlue
+  | Archived => LabelGray
+  | PartiallyReconciled | Missing => LabelOrange
+  | Void
+  | UnknownDomainTransactionStatus
+  | Matched(UnknownDomainTransactionMatchedStatus)
+  | OverAmount(UnknownDomainTransactionAmountMismatchStatus)
+  | UnderAmount(UnknownDomainTransactionAmountMismatchStatus)
+  | Posted(UnknownDomainTransactionPostedStatus) =>
+    LabelLightGray
+  }
+}
+
+let getTransactionsTransformationHistoryPayloadFromDict = dict => {
+  dict->transformationHistoryItemToObjMapper
+}
+
+let getTransactionsIngestionHistoryPayloadFromDict = dict => {
+  dict->ingestionHistoryItemToObjMapper
+}
+
+let getTransactionsProcessingEntryPayloadFromDict = dict => {
+  dict->processingItemToObjMapper
+}
+
+let getLineageSections = (
+  ~ingestionHistoryData: ingestionHistoryType,
+  ~transformationHistoryData: transformationHistoryType,
+  ~processingEntry: processingEntryType,
+  ~entry: entryType,
+) => [
+  {
+    lineageSectionTitle: "Source",
+    lineageSectionFields: [
+      {
+        lineageFieldLabel: "File Name",
+        lineageFieldValue: ingestionHistoryData.file_name,
+        lineageFileCopyable: false,
+      },
+      {
+        lineageFieldLabel: "Ingestion Id",
+        lineageFieldValue: ingestionHistoryData.ingestion_id,
+        lineageFileCopyable: true,
+      },
+    ],
+  },
+  {
+    lineageSectionTitle: "Transformation",
+    lineageSectionFields: [
+      {
+        lineageFieldLabel: "Transformation Name",
+        lineageFieldValue: transformationHistoryData.transformation_name,
+        lineageFileCopyable: false,
+      },
+      {
+        lineageFieldLabel: "Transformation ID",
+        lineageFieldValue: transformationHistoryData.transformation_id,
+        lineageFileCopyable: true,
+      },
+    ],
+  },
+  {
+    lineageSectionTitle: "Transformed Entry",
+    lineageSectionFields: [
+      {
+        lineageFieldLabel: "Transformed Entry Id",
+        lineageFieldValue: processingEntry.staging_entry_id,
+        lineageFileCopyable: true,
+      },
+    ],
+  },
+  {
+    lineageSectionTitle: "Entry",
+    lineageSectionFields: [
+      {
+        lineageFieldLabel: "Entry Id",
+        lineageFieldValue: entry.entry_id,
+        lineageFileCopyable: true,
+      },
+      {
+        lineageFieldLabel: "Order Id",
+        lineageFieldValue: entry.order_id,
+        lineageFileCopyable: true,
+      },
+    ],
+  },
+]
+
+let bulkActionPostingModalConfig = (~count: int) => {
+  bulkActionModal: {
+    modalHeading: "Post Transaction",
+    modalDescription: `This will permanently post ${count->Int.toString} transaction${pluralText(
+        ~count,
+      )} to the ledger. Once posted, these actions cannot be reversed. Are you sure you want to continue?`,
+    modalConfirmButtonText: "Post Transaction",
+    modalConfirmButtonType: Primary,
+    modalLoadingText: `Posting transaction${pluralText(~count)}...`,
+  },
+}
+
+let bulkActionVoidingModalConfig = (~count: int, ~hasSelectionChoice: bool) => {
+  bulkActionModal: {
+    modalHeading: "Ignore Transaction",
+    modalDescription: hasSelectionChoice
+      ? "Ignored transactions are excluded from the ledger and cannot be restored. Choose what this should apply to."
+      : `This will permanently ignore ${count->Int.toString} transaction${pluralText(
+            ~count,
+          )} and exclude them from the ledger. These actions cannot be undone. Are you sure you want to proceed?`,
+    modalConfirmButtonText: "Ignore Transaction",
+    modalConfirmButtonType: Delete,
+    modalLoadingText: `Ignoring transaction${pluralText(~count)}...`,
+  },
+}
+
+let getBulkActionModalConfig = (
+  ~action: actionType,
+  ~count: int,
+  ~hasSelectionChoice: bool=false,
+): bulkActionModalConfig => {
+  switch action {
+  | BulkTransactionPost => bulkActionPostingModalConfig(~count)
+  | BulkTransactionVoid => bulkActionVoidingModalConfig(~count, ~hasSelectionChoice)
+  | UnknownBulkTransactionActionType => {
+      bulkActionModal: {
+        modalHeading: "",
+        modalDescription: "",
+        modalConfirmButtonText: "",
+        modalConfirmButtonType: Secondary,
+        modalLoadingText: "",
+      },
+    }
+  }
+}
+
+let bulkActionPostingSuccessModalConfig = (
+  ~successCount: int,
+  ~failedCount: int,
+  ~skippedCount: int,
+  ~totalCount: int,
+): bulkActionModalConfig => {
+  if successCount == totalCount {
+    {
+      bulkActionModal: {
+        modalHeading: "Transactions Posted",
+        modalDescription: "All transactions were posted successfully. This summary will be cleared after you close this window. Download the report to retain a record.",
+        modalConfirmButtonText: "Download Posting Report",
+        modalConfirmButtonType: Primary,
+        modalLoadingText: "",
+      },
+      bulkActionIcon: {
+        bulkActionIconName: "nd-check-circle-outline",
+        bulkActionIconClass: "text-nd_green-500",
+      },
+    }
+  } else if failedCount + skippedCount == totalCount {
+    {
+      bulkActionModal: {
+        modalHeading: "Posting Failed",
+        modalDescription: "Selected transactions could not be posted. This summary will be cleared after you close this window. Download the report to retain a record.",
+        modalConfirmButtonText: "Download Posting Report",
+        modalConfirmButtonType: Primary,
+        modalLoadingText: "",
+      },
+      bulkActionIcon: {
+        bulkActionIconName: "nd-multiple-cross",
+        bulkActionIconClass: "text-nd_red-400",
+      },
+    }
+  } else {
+    {
+      bulkActionModal: {
+        modalHeading: "Posting Completed with Errors",
+        modalDescription: `${successCount->Int.toString}/${totalCount->Int.toString} transaction${pluralText(
+            ~count=successCount,
+          )} were posted successfully. This summary will be cleared after you close this window. Download the report to retain a record.`,
+        modalConfirmButtonText: "Download Posting Report",
+        modalConfirmButtonType: Primary,
+        modalLoadingText: "",
+      },
+      bulkActionIcon: {
+        bulkActionIconName: "nd-alert-circle",
+        bulkActionIconClass: "text-nd_orange-300",
+      },
+    }
+  }
+}
+
+let bulkActionVoidingSuccessModalConfig = (
+  ~successCount: int,
+  ~failedCount: int,
+  ~skippedCount: int,
+  ~totalCount: int,
+): bulkActionModalConfig => {
+  if successCount == totalCount {
+    {
+      bulkActionModal: {
+        modalHeading: `Transaction${pluralText(~count=successCount)} Ignored`,
+        modalDescription: "All transactions were ignored successfully. This summary will be cleared after you close this window. Download the report to retain a record.",
+        modalConfirmButtonText: "Download Ignoring Report",
+        modalConfirmButtonType: Primary,
+        modalLoadingText: "",
+      },
+      bulkActionIcon: {
+        bulkActionIconName: "nd-check-circle-outline",
+        bulkActionIconClass: "text-nd_green-500",
+      },
+    }
+  } else if failedCount + skippedCount == totalCount {
+    {
+      bulkActionModal: {
+        modalHeading: `Transaction${pluralText(
+            ~count={failedCount + skippedCount},
+          )} Ignored Failed`,
+        modalDescription: "Selected transactions could not be ignored. This summary will be cleared after you close this window. Download the report to retain a record.",
+        modalConfirmButtonText: "Download Ignoring Report",
+        modalConfirmButtonType: Primary,
+        modalLoadingText: "",
+      },
+      bulkActionIcon: {
+        bulkActionIconName: "nd-multiple-cross",
+        bulkActionIconClass: "text-nd_red-400",
+      },
+    }
+  } else {
+    {
+      bulkActionModal: {
+        modalHeading: `Transaction${pluralText(~count=successCount)} Ignored Completed with Errors`,
+        modalDescription: `${successCount->Int.toString}/${totalCount->Int.toString} transaction${pluralText(
+            ~count=successCount,
+          )} were ignored successfully. This summary will be cleared after you close this window. Download the report to retain a record.`,
+        modalConfirmButtonText: "Download Ignoring Report",
+        modalConfirmButtonType: Primary,
+        modalLoadingText: "",
+      },
+      bulkActionIcon: {
+        bulkActionIconName: "nd-alert-circle",
+        bulkActionIconClass: "text-nd_orange-300",
+      },
+    }
+  }
+}
+let getBulkActionSuccessModalConfig = (
+  action: actionType,
+  successCount: int,
+  failedCount: int,
+  skippedCount: int,
+  totalCount: int,
+): bulkActionModalConfig => {
+  switch action {
+  | BulkTransactionPost =>
+    bulkActionPostingSuccessModalConfig(~successCount, ~failedCount, ~skippedCount, ~totalCount)
+  | BulkTransactionVoid =>
+    bulkActionVoidingSuccessModalConfig(~successCount, ~failedCount, ~skippedCount, ~totalCount)
+  | UnknownBulkTransactionActionType => {
+      bulkActionModal: {
+        modalHeading: "",
+        modalDescription: "",
+        modalConfirmButtonText: "",
+        modalConfirmButtonType: Secondary,
+        modalLoadingText: "",
+      },
+      bulkActionIcon: {bulkActionIconName: "", bulkActionIconClass: ""},
+    }
+  }
+}
+
+let bulkActionRecordLimitModalConfig: bulkActionModalConfig = {
+  bulkActionModal: {
+    modalHeading: "Too Many Transactions Matched",
+    modalDescription: "This action matched more transactions than can be processed at once. Narrow your filters and try again — nothing was changed.",
+    modalConfirmButtonText: "Close",
+    modalConfirmButtonType: Primary,
+    modalLoadingText: "",
+  },
+  bulkActionIcon: {
+    bulkActionIconName: "nd-alert-triangle",
+    bulkActionIconClass: "text-nd_orange-300",
+  },
+}
+
+let bulkActionFailureMessage = (action: actionType) => {
+  switch action {
+  | BulkTransactionPost => "Failed to post transactions. Please try again."
+  | BulkTransactionVoid => "Failed to ignore transactions. Please try again."
+  | UnknownBulkTransactionActionType => "Something went wrong. Please try again."
+  }
+}
+
+let downloadBulkActionReport = (
+  bulkActionResponses: array<ReconEngineExceptionsTypes.bulkActionResponse>,
+  ~action: actionType,
+) => {
+  let headers = ["ID", "Status", "Status Detail"]
+  let data = bulkActionResponses->Array.map(item => {
+    [
+      item.logical_id->Option.getOr("N/A"),
+      (item.bulk_action_status :> string)->String.toUpperCase,
+      item.bulk_action_status_detail->Option.getOr(""),
+    ]
+  })
+
+  let csvContent = PapaParse.unparse({"fields": headers, "data": data})
+  let timestamp = Date.now()->Js.Float.toString
+
+  DownloadUtils.download(
+    ~fileName=`${(action :> string)}_transaction_report_${timestamp}.csv`,
+    ~content=csvContent,
+    ~fileType="text/csv",
+  )
+}

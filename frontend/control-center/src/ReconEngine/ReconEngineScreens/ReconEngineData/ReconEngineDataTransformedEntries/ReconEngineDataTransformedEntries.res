@@ -1,0 +1,206 @@
+open Typography
+
+@react.component
+let make = () => {
+  open LogicUtils
+  open APIUtils
+  open ReconEngineDataTransformedEntriesUtils
+  open ReconEngineDataTransformedEntriesTypes
+  open ReconEngineHooks
+  open ReconEngineFilterUtils
+
+  let getProcessingEntriesV2 = useGetCursorPage(
+    ~hyperswitchReconType=#PROCESSING_ENTRIES_LIST_V2,
+    ~itemMapper=ReconEngineUtils.processingItemToObjMapper,
+  )
+  let getAccounts = useGetAccounts()
+  let getTransformationConfigs = useGetTransformationConfigs()
+  let getURL = useGetURL()
+  let fetchDetails = useGetMethod()
+  let {updateExistingKeys, filterValueJson, filterValue, filterKeys} = React.useContext(
+    FilterContext.filterContext,
+  )
+  let globalDateFilters = ReconEngineAtoms.globalDateFiltersAtom->Recoil.useRecoilValueFromAtom
+  let filterValueJsonWithGlobalDate = mergeGlobalDateFilters(~filterValueJson, ~globalDateFilters)
+  let searchTypeRef = React.useRef(SearchStagingEntryId)
+  let (searchText, setSearchText) = React.useState(_ => "")
+
+  let sortDict = Recoil.useRecoilValueFromAtom(LoadedTable.sortAtom)
+  let title = "All Transformed Entries"
+  let sortOrder = sortDict->getMappedValueFromDict(title, Desc, getSortOrder)
+  let showToast = ToastAdapter.useShowToast()
+
+  let {
+    items: processingEntries,
+    cursors,
+    screenState,
+    goToFirstPage,
+    goToNextPage,
+    goToPrevPage,
+  } = ReconEngineCursorPaginationHook.useCursorPagination(~fetchPage=(~sortBy, ~direction) => {
+    getProcessingEntriesV2(
+      ~body=buildProcessingEntriesV2Body(
+        ~filterValueJson=filterValueJsonWithGlobalDate,
+        ~searchType=searchTypeRef.current,
+        ~searchText,
+        ~sortBy,
+        ~direction,
+        ~order=sortOrder,
+      ),
+    )
+  }, ~persistKey=Some("recon-engine-transformed-entries"))
+
+  let (accountData, setAccountData) = React.useState(_ => [])
+  let (transformationConfigData, setTransformationConfigData) = React.useState(_ => [])
+  let (offset, setOffset) = React.useState(_ => 0)
+
+  let accountOptions =
+    accountData->Array.map((
+      account: ReconEngineTypes.accountType,
+    ): FilterSelectBox.dropdownOption => {
+      label: account.account_name,
+      value: account.account_id,
+    })
+
+  let transformationConfigOptions =
+    transformationConfigData->Array.map((
+      config: ReconEngineTypes.transformationConfigType,
+    ): FilterSelectBox.dropdownOption => {
+      label: config.name,
+      value: config.transformation_id,
+    })
+
+  let fetchAccountAndTransformationConfigs = async () => {
+    try {
+      let (accounts, transformationConfigs) = await Promise.all2((
+        getAccounts(),
+        getTransformationConfigs(),
+      ))
+      setAccountData(_ => accounts)
+      setTransformationConfigData(_ => transformationConfigs)
+    } catch {
+    | _ => showToast(~message="Failed to fetch accounts or transformations", ~toastType=ToastError)
+    }
+  }
+
+  let handleSearchSubmit = (selectedType: option<string>) => {
+    let newSearchType = selectedType->mapOptionOrDefault(SearchStagingEntryId, searchTypeFromString)
+    searchTypeRef.current = newSearchType
+    goToFirstPage()
+  }
+
+  React.useEffect(() => {
+    fetchAccountAndTransformationConfigs()->ignore
+    None
+  }, [])
+
+  React.useEffect(() => {
+    if hasGlobalDateFilterValue(~globalDateFilters) {
+      goToFirstPage()
+    }
+    None
+  }, (filterValue, sortOrder, globalDateFilters))
+
+  let topFilterUi = {
+    <div className="flex flex-row -ml-1.5">
+      <DynamicFilter
+        title="ReconEngineDataTransformedEntriesFilters"
+        initialFilters={initialDisplayFilters(~accountOptions, ~transformationConfigOptions)}
+        options=[]
+        popupFilterFields=[]
+        initialFixedFilters=[]
+        defaultFilterKeys=[]
+        tabNames=filterKeys
+        key="ReconEngineDataTransformedEntriesFilters"
+        updateUrlWith=updateExistingKeys
+        filterFieldsPortalName={HSAnalyticsUtils.filterFieldsPortalName}
+        showCustomFilter=false
+        refreshFilters=false
+      />
+    </div>
+  }
+
+  let onEntityClick = async (transformedEntry: ReconEngineTypes.processingEntryType) => {
+    try {
+      if transformedEntry.transformation_history_id->isNonEmptyString {
+        let url = getURL(
+          ~entityName=V1(HYPERSWITCH_RECON),
+          ~methodType=Get,
+          ~hyperswitchReconType=#TRANSFORMATION_HISTORY,
+          ~queryParameters=None,
+          ~id=Some(transformedEntry.transformation_history_id),
+        )
+        let res = await fetchDetails(url)
+        let transformationHistoryData =
+          res->getDictFromJsonObject->getTransformedEntriesTransformationHistoryPayloadFromDict
+        RescriptReactRouter.push(
+          GlobalVars.appendDashboardPath(
+            ~url=`/v1/recon-engine/transformed-entries/ingestion-history/${transformationHistoryData.ingestion_history_id}?transformationHistoryId=${transformedEntry.transformation_history_id}&stagingEntryId=${transformedEntry.staging_entry_id}`,
+          ),
+        )
+      }
+    } catch {
+    | _ => showToast(~message="Failed to fetch transformation history", ~toastType=ToastError)
+    }
+  }
+
+  <div className="flex flex-col gap-5 w-full">
+    <div className="flex flex-row justify-between items-center">
+      <PageUtils.PageHeading
+        title="Transformed Entries"
+        customTitleStyle={`${heading.lg.semibold}`}
+        customHeadingStyle="py-0"
+      />
+      <PortalCapture name=globalDateFilterPortalName customStyle="-mt-4" />
+    </div>
+    <ReconEngineHelper.GlobalDateFilterBanner />
+    <ReconEngineDataTransformedEntriesOverviewCards selectedTransformationHistoryId=None />
+    <PageLoaderWrapper screenState>
+      <div className="flex flex-col gap-4">
+        <div className="flex-shrink-0"> {topFilterUi} </div>
+        <LoadedTable
+          title
+          hideTitle=true
+          actualData={processingEntries->Array.map(Nullable.make)}
+          entity={ReconEngineExceptionEntity.processingTableEntity}
+          resultsPerPage=10
+          totalResults={processingEntries->Array.length}
+          offset
+          setOffset
+          currentFetchCount={processingEntries->Array.length}
+          tableheadingClass="h-12"
+          tableHeadingTextClass="!font-normal"
+          nonFrozenTableParentClass="!rounded-lg"
+          loadedTableParentClass="flex flex-col"
+          enableEqualWidthCol=false
+          onEntityClick={val => {
+            onEntityClick(val)->ignore
+          }}
+          showAutoScroll=true
+          remoteSortEnabled=true
+          showPagination=false
+          showResultsPerPageSelector=false
+          tableDataLoading={screenState === PageLoaderWrapper.Loading}
+          dataLoading={screenState === PageLoaderWrapper.Loading}
+          filters={<SearchInput
+            inputText=searchText
+            onChange={value => setSearchText(_ => value)}
+            placeholder="Search by ID"
+            showTypeSelector=true
+            typeSelectorOptions=searchTypeOptionsWithTransformationHistory
+            onSubmitSearchDropdown=handleSearchSubmit
+            showSearchIcon=true
+            widthClass="w-max"
+          />}
+          bottomActions={<ReconEngineCursorPaginationButtons
+            cursors
+            isLoading={screenState === PageLoaderWrapper.Loading}
+            hasData={processingEntries->isNonEmptyArray}
+            onPrev=goToPrevPage
+            onNext=goToNextPage
+          />}
+        />
+      </div>
+    </PageLoaderWrapper>
+  </div>
+}

@@ -1,0 +1,451 @@
+module RenderSavedPaymentMethodItem = {
+  @react.component
+  let make = (~paymentItem: PaymentType.customerMethods, ~paymentMethodType) => {
+    let {localeString} = Jotai.useAtomValue(JotaiAtoms.configAtom)
+    switch paymentItem.paymentMethod {
+    | "card" =>
+      <div
+        className="flex flex-col items-start"
+        role="group"
+        ariaLabel={`Card ${paymentItem.card.nickname}, ending in ${paymentItem.card.last4Digits}`}
+      >
+        <div className="text-base tracking-wide">
+          {React.string(
+            paymentItem.card.nickname->String.length > 15
+              ? paymentItem.card.nickname->String.slice(~start=0, ~end=13)->String.concat("..")
+              : paymentItem.card.nickname,
+          )}
+        </div>
+        <div className={`PickerItemLabel flex flex-row gap-3 items-center text-sm`}>
+          <div className="tracking-widest" ariaHidden=true> {React.string(`****`)} </div>
+          <div className="tracking-wide" ariaHidden=true>
+            {React.string(paymentItem.card.last4Digits)}
+          </div>
+        </div>
+      </div>
+
+    | "bank_debit" =>
+      <div
+        className="flex flex-col items-start"
+        role="group"
+        ariaLabel={`${paymentMethodType->String.toUpperCase} bank debit account ending in ${paymentItem.bank.mask}`}
+      >
+        <div>
+          {React.string(
+            `${paymentMethodType->String.toUpperCase} ${paymentItem.paymentMethod->Utils.snakeToTitleCase}`,
+          )}
+        </div>
+        <div className={`PickerItemLabel flex flex-row gap-3 items-center`}>
+          <div className="tracking-widest" ariaHidden=true> {React.string(`****`)} </div>
+          <div ariaHidden=true> {React.string(paymentItem.bank.mask)} </div>
+        </div>
+      </div>
+
+    | "bank_redirect" =>
+      // Open-banking saved methods often carry no account mask; the secondary
+      // row (and its aria fragment) only renders when there is something to show.
+      let hasMask = paymentItem.bankRedirect.mask->String.length > 0
+      let hasHolderName = paymentItem.bankRedirect.accountHolderName->String.length > 0
+      let maskFragment = hasMask ? `, account ending in ${paymentItem.bankRedirect.mask}` : ""
+      <div
+        className="flex flex-col items-start"
+        role="group"
+        ariaLabel={`${localeString.payment_methods_pay_by_bank} – ${paymentItem.bankRedirect.bankName}${maskFragment}`}
+      >
+        <div className="text-base tracking-wide">
+          {React.string(
+            paymentItem.bankRedirect.bankName->String.length > 0
+              ? paymentItem.bankRedirect.bankName
+              : localeString.payment_methods_pay_by_bank,
+          )}
+        </div>
+        <RenderIf condition={hasMask || hasHolderName}>
+          <div className={`PickerItemLabel flex flex-row gap-3 items-center text-sm`}>
+            <RenderIf condition={hasMask}>
+              <>
+                <div className="tracking-widest" ariaHidden=true> {React.string(`****`)} </div>
+                <div className="tracking-wide" ariaHidden=true>
+                  {React.string(paymentItem.bankRedirect.mask)}
+                </div>
+              </>
+            </RenderIf>
+            <RenderIf condition={hasHolderName}>
+              <div className="opacity-80" ariaHidden=true>
+                {React.string(paymentItem.bankRedirect.accountHolderName)}
+              </div>
+            </RenderIf>
+          </div>
+        </RenderIf>
+      </div>
+
+    | _ =>
+      <div ariaLabel={paymentMethodType->Utils.snakeToTitleCase}>
+        {React.string(paymentMethodType->Utils.snakeToTitleCase)}
+      </div>
+    }
+  }
+}
+
+@react.component
+let make = (
+  ~setPaymentToken,
+  ~isActive,
+  ~paymentItem: PaymentType.customerMethods,
+  ~brandIcon,
+  ~index,
+  ~savedCardlength,
+  ~setRequiredFieldsBody,
+  ~setSelectedInstallmentPlan,
+  ~showInstallments,
+  ~setShowInstallments,
+  ~installmentsError,
+  ~setInstallmentsError,
+  ~eligibilitySurchargeDetails: option<EligibilityHelpers.eligibilitySurchargeDetails>,
+  ~eligibilityOfferDetails: option<EligibilityHelpers.eligibilityOfferDetails>,
+  ~eligibilityError: option<string>,
+  ~isEligibilityPending=false,
+  // `isVaultCvcFlow` only selects whether the inner collector returns a vault
+  // token or raw CVC. SavedCardItem always renders that collector through
+  // ParentCardComponent.
+  ~isVaultCvcFlow=false,
+  ~setCvcIframeRef=_ => (),
+  ~setSavedCardCvcState=_ => (),
+) => {
+  let {themeObj, config, localeString} = Jotai.useAtomValue(JotaiAtoms.configAtom)
+  let {
+    hideExpiredPaymentMethods,
+    displayDefaultSavedPaymentIcon,
+    displayBillingDetails,
+    layout,
+  } = Jotai.useAtomValue(JotaiAtoms.optionAtom)
+  let {hideCardExpiry} = CardUtils.getLayoutClass(layout).savedMethodCustomization
+  let {innerLayout} = config.appearance
+  let (cardBrand, setCardBrand) = Jotai.useAtom(JotaiAtoms.cardBrand)
+  let (savedCardCvcState, setLocalSavedCardCvcState) = React.useState(_ =>
+    CardIframeProtocol.initialSavedCardCvcState
+  )
+  let savedCardBrand = paymentItem.card.scheme->Option.getOr("")->CardUtils.normalizeCardBrand
+  let isCvcEmpty = savedCardCvcState.empty
+  let pickerItemClass = isActive ? "PickerItem--selected" : ""
+
+  let focusCVC = () => {
+    setCardBrand(_ => savedCardBrand)
+  }
+
+  let isCard = paymentItem.paymentMethod === "card"
+  let isRenderCvv = isCard && paymentItem.requiresCvv
+  let expiryMonth = paymentItem.card.expiryMonth
+  let expiryYear = paymentItem.card.expiryYear
+  let cardLast4 = paymentItem.card.last4Digits
+  let cardBin = paymentItem.card.cardBin
+
+  let paymentMethodType = switch paymentItem.paymentMethodType {
+  | Some(paymentMethodType) => paymentMethodType
+  | None => "debit"
+  }
+  let {country, state, pinCode} = PaymentUtils.useNonPiiAddressData()
+  let emitter = SubscriptionEventHooks.useSubscriptionEventEmitter()
+
+  React.useEffect(() => {
+    setSelectedInstallmentPlan(_ => None)
+    setShowInstallments(_ => false)
+    None
+  }, [paymentItem])
+
+  let isOneClickWallet = paymentItem.paymentMethod === "wallet"
+
+  React.useEffect(() => {
+    if isActive {
+      PaymentUtils.emitPaymentMethodInfo(
+        ~paymentMethod=paymentItem.paymentMethod,
+        ~paymentMethodType,
+        ~cardBrand=paymentItem.card.scheme->Option.getOr("")->CardUtils.getCardType,
+        ~country,
+        ~state,
+        ~pinCode,
+        ~cardExpiryMonth=expiryMonth,
+        ~cardExpiryYear=expiryYear,
+        ~cardLast4,
+        ~cardBin,
+        ~isSavedPaymentMethod=true,
+        ~isCvcEmpty,
+      )
+      emitter.emitPaymentMethodStatus(
+        ~paymentMethod=paymentItem.paymentMethod,
+        ~paymentMethodType,
+        ~isSavedPaymentMethod=true,
+        ~isOneClickWallet,
+      )
+      emitter.emitBillingAddress(~country, ~state, ~postalCode=pinCode)
+    }
+    None
+  }, (isActive, paymentItem, country, state, pinCode, isCvcEmpty))
+
+  React.useEffect(() => {
+    open CardUtils
+    if isActive {
+      // * Focus CVC
+      focusCVC()
+      // * Sending card expiry to handle cases where the card expires before the use date.
+      `${expiryMonth}${String.substring(~start=2, ~end=4, expiryYear)}`
+      ->CardValidations.formatCardExpiryNumber
+      ->emitExpiryDate
+    }
+    None
+  }, (isActive, paymentItem, country, state, pinCode))
+
+  React.useEffect(() => {
+    CardUtils.emitIsFormReadyForSubmission(savedCardCvcState.valid)
+    None
+  }, [savedCardCvcState.valid])
+
+  let expiryDate = Date.fromString(`${expiryYear}-${expiryMonth}`)
+  expiryDate->Date.setMonth(expiryDate->Date.getMonth + 1)
+  let currentDate = Date.make()
+  let isCardExpired = isCard && expiryDate < currentDate
+
+  let billingDetailsText = "Billing Details:"
+
+  let billingDetailsArray =
+    [
+      paymentItem.billing.address.line1,
+      paymentItem.billing.address.line2,
+      paymentItem.billing.address.line3,
+      paymentItem.billing.address.city,
+      paymentItem.billing.address.state,
+      paymentItem.billing.address.country,
+      paymentItem.billing.address.zip,
+    ]
+    ->Array.map(item => Option.getOr(item, ""))
+    ->Array.filter(item => String.trim(item) !== "")
+
+  let billingDetailsArrayLength = Array.length(billingDetailsArray)
+
+  let isFloating = config.appearance.labels == Floating
+  let cvcContainerClassName = isFloating ? "flex w-24" : "flex w-16 opacity-50"
+
+  // Inner-iframe container id for the saved-card CVC. Only the active card
+  // mounts this iframe (the CVC slots below are gated on isActive), so a single
+  // constant id is unique at any time.
+  let cvcIframeContainerId = "saved-card-cvc-inner-iframe-container"
+  let cardCollectionMode = isVaultCvcFlow ? "tokenise" : "raw"
+  let handleSavedCardCvcStateChange = state => {
+    setLocalSavedCardCvcState(_ => state)
+    setSavedCardCvcState(state)
+  }
+  let makeCvcField = () =>
+    <ParentCardComponent
+      key=cardCollectionMode
+      isSavedCardFlow=true
+      containerId=cvcIframeContainerId
+      setExternalIframeRef=setCvcIframeRef
+      onSavedCardCvcStateChange=handleSavedCardCvcStateChange
+      savedCardBrand
+      cardCollectionMode
+    />
+
+  let paymentMethodListValue = Jotai.useAtomValue(PaymentUtils.paymentMethodListValue)
+  let installmentOptions = paymentMethodListValue.intent_data.installment_options->Option.getOr([])
+
+  let hasInstallmentPlans =
+    installmentOptions
+    ->PaymentUtils.filterInstallmentPlansByPaymentMethod(paymentItem.paymentMethod)
+    ->Array.length > 0
+
+  <RenderIf condition={!hideExpiredPaymentMethods || !isCardExpired}>
+    <button
+      className={`PickerItem ${pickerItemClass} flex flex-row items-stretch`}
+      type_="button"
+      style={
+        minWidth: "150px",
+        width: "100%",
+        padding: "1rem 0 1rem 0",
+        cursor: "pointer",
+        borderBottom: index == savedCardlength - 1 ? "0px" : `1px solid ${themeObj.borderColor}`,
+        borderTop: "none",
+        borderLeft: "none",
+        borderRight: "none",
+        borderRadius: "0px",
+        background: "transparent",
+        color: themeObj.colorTextSecondary,
+        boxShadow: "none",
+        opacity: {isCardExpired ? "0.7" : "1"},
+      }
+      onClick={_ => {
+        open JotaiAtomTypes
+        setPaymentToken(_ => {
+          paymentToken: paymentItem.paymentToken,
+          customerId: paymentItem.customerId,
+        })
+      }}
+    >
+      <div className="w-full">
+        <div>
+          <div className="flex flex-row justify-between items-center">
+            <div
+              className={`flex flex-row justify-center items-center`}
+              style={columnGap: themeObj.spacingUnit}
+            >
+              <div style={color: isActive ? themeObj.colorPrimary : ""}>
+                <Radio
+                  checked=isActive
+                  height="18px"
+                  className="savedcard"
+                  marginTop="-2px"
+                  opacity="20%"
+                  padding="46%"
+                  border="1px solid currentColor"
+                />
+              </div>
+              <div className={`PickerItemIcon mx-3 flex  items-center `}> brandIcon </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-4">
+                  <RenderSavedPaymentMethodItem paymentItem={paymentItem} paymentMethodType />
+                  <RenderIf
+                    condition={displayDefaultSavedPaymentIcon &&
+                    paymentItem.defaultPaymentMethodSet}
+                  >
+                    <Icon size=16 name="checkmark" style={color: themeObj.colorPrimary} />
+                  </RenderIf>
+                </div>
+              </div>
+            </div>
+            <RenderIf condition={isCard && !hideCardExpiry}>
+              <div
+                className={`flex flex-row items-center justify-end gap-3 -mt-1`}
+                style={fontSize: "14px", opacity: "0.5"}
+                ariaLabel={`Expires ${expiryMonth} / ${expiryYear->CardUtils.formatExpiryToTwoDigit}`}
+              >
+                <div className="flex" ariaHidden=true>
+                  {React.string(`${expiryMonth} / ${expiryYear->CardUtils.formatExpiryToTwoDigit}`)}
+                </div>
+              </div>
+            </RenderIf>
+            <RenderIf condition={hideCardExpiry && isActive && isRenderCvv}>
+              <div className="flex flex-row items-center gap-2 mr-2">
+                <RenderIf condition={!isFloating}>
+                  <div className="tracking-widest opacity-50">
+                    {React.string(`${localeString.cvcTextLabel}:`)}
+                  </div>
+                </RenderIf>
+                <div className={cvcContainerClassName}> {makeCvcField()} </div>
+              </div>
+            </RenderIf>
+          </div>
+          <div className="w-full">
+            <div className="flex flex-col items-start ml-8">
+              <RenderIf condition={!hideCardExpiry && isActive && isRenderCvv}>
+                <div
+                  className={`flex flex-row items-start justify-start gap-2`}
+                  style={fontSize: "14px", opacity: "0.5"}
+                >
+                  <div className="tracking-widest w-12 mt-6">
+                    {React.string(`${localeString.cvcTextLabel}: `)}
+                  </div>
+                  <div
+                    className={`flex h mx-4 justify-start w-16 ${isActive
+                        ? "opacity-1 mt-4"
+                        : "opacity-0"}`}
+                  >
+                    {makeCvcField()}
+                  </div>
+                </div>
+              </RenderIf>
+              <RenderIf
+                condition={hideCardExpiry &&
+                isActive &&
+                innerLayout === Spaced &&
+                savedCardCvcState.error !== ""}
+              >
+                <div
+                  className="Error pt-1 mt-1 ml-3"
+                  style={
+                    color: themeObj.colorDangerText,
+                    fontSize: themeObj.fontSizeSm,
+                  }
+                >
+                  {React.string(savedCardCvcState.error)}
+                </div>
+              </RenderIf>
+              <RenderIf
+                condition={isActive && displayBillingDetails && billingDetailsArrayLength > 0}
+              >
+                <div className="tracking-wide text-sm text-left gap-2 mt-4 ml-2">
+                  <div className="font-semibold"> {React.string(billingDetailsText)} </div>
+                  <div className="font-normal">
+                    {React.string(Array.join(billingDetailsArray, ", "))}
+                  </div>
+                </div>
+              </RenderIf>
+              <RenderIf
+                condition={!hideCardExpiry &&
+                isActive &&
+                innerLayout === Spaced &&
+                savedCardCvcState.error !== ""}
+              >
+                <div
+                  className="Error pt-1 mt-1 ml-1"
+                  style={
+                    color: themeObj.colorDangerText,
+                    fontSize: themeObj.fontSizeSm,
+                  }
+                >
+                  {React.string(savedCardCvcState.error)}
+                </div>
+              </RenderIf>
+              <RenderIf condition={isCardExpired}>
+                <div className="italic mt-3 ml-1" style={fontSize: "14px", opacity: "0.7"}>
+                  {`*${localeString.cardExpiredText}`->React.string}
+                </div>
+              </RenderIf>
+              <RenderIf condition={isActive}>
+                <RenderIf condition={isCard}>
+                  <EligibilityOfferNotice
+                    eligibilityOfferDetails isEligibilityPending className="mt-3"
+                  />
+                </RenderIf>
+                <RenderIf condition={isCard && hasInstallmentPlans}>
+                  <div
+                    style={
+                      paddingTop: themeObj.spacingUnit,
+                    }
+                    className="w-full flex pl-1"
+                  >
+                    <InstallmentOptions
+                      setSelectedInstallmentPlan
+                      showInstallments
+                      setShowInstallments
+                      paymentMethod=paymentItem.paymentMethod
+                      errorString=installmentsError
+                      setErrorString=setInstallmentsError
+                    />
+                  </div>
+                </RenderIf>
+                <DynamicFields
+                  paymentMethod=paymentItem.paymentMethod
+                  paymentMethodType
+                  setRequiredFieldsBody
+                  isSavedCardFlow=true
+                  savedMethod=paymentItem
+                />
+                <Surcharge
+                  paymentMethod=paymentItem.paymentMethod
+                  paymentMethodType
+                  cardBrand={cardBrand->CardUtils.getCardType}
+                />
+                <RenderIf condition={isCard}>
+                  <EligibilityNotice
+                    eligibilitySurchargeDetails
+                    eligibilityError
+                    isEligibilityPending
+                    className="mt-3"
+                  />
+                </RenderIf>
+              </RenderIf>
+            </div>
+          </div>
+        </div>
+      </div>
+    </button>
+  </RenderIf>
+}

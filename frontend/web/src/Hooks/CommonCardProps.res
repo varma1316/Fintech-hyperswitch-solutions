@@ -1,0 +1,434 @@
+open CardUtils
+open LoggerUtils
+open JotaiAtoms
+
+let useCardForm = (
+  ~logger,
+  ~paymentType,
+  ~runEligibility=true,
+  ~logControlEvents=true,
+  ~enableExternalCardSupport=false,
+  ~cardBrandOverride="",
+) => {
+  let {localeString} = Jotai.useAtomValue(configAtom)
+  let cardScheme = Jotai.useAtomValue(cardBrand)
+  let showPaymentMethodsScreen = Jotai.useAtomValue(showPaymentMethodsScreen)
+  let selectedOption = Jotai.useAtomValue(selectedOptionAtom)
+  let paymentToken = Jotai.useAtomValue(paymentTokenAtom)
+  let paymentMethodListValue = Jotai.useAtomValue(PaymentUtils.paymentMethodListValue)
+  let forwardedSupportedCardBrands = Jotai.useAtomValue(JotaiAtoms.supportedCardBrands)
+  let {parentURL} = Jotai.useAtomValue(keys)
+  let {
+    cardEligibilityError,
+    updateCardEligibilityError,
+    eligibilitySurchargeDetails,
+    eligibilityOfferDetails,
+    isEligibilityPending,
+    triggerOnCardNumberChange,
+    resetEligibilityState,
+  } = UseCardEligibility.useCardEligibility(~logger, ~runEligibility)
+  let (cardNumber, setCardNumber) = React.useState(_ => "")
+  let (cardExpiry, setCardExpiry) = React.useState(_ => "")
+  let (cvcNumber, setCvcNumber) = React.useState(_ => "")
+  let (zipCode, setZipCode) = React.useState(_ => "")
+  let (cardError, setCardError) = React.useState(_ => "")
+  let (cvcError, setCvcError) = React.useState(_ => "")
+  let (expiryError, setExpiryError) = React.useState(_ => "")
+
+  let (displayPincode, setDisplayPincode) = React.useState(_ => false)
+  let (blurState, setBlurState) = React.useState(_ => false)
+
+  let cardRef = React.useRef(Nullable.null)
+  let expiryRef = React.useRef(Nullable.null)
+  let cvcRef = React.useRef(Nullable.null)
+  let zipRef = React.useRef(Nullable.null)
+  let isCoBadgedCardDetectedOnce = React.useRef(false)
+  let prevCardBrandRef = React.useRef("")
+
+  let (isCardValid, setIsCardValid) = React.useState(_ => None)
+  let (isExpiryValid, setIsExpiryValid) = React.useState(_ => None)
+  let (isCVCValid, setIsCVCValid) = React.useState(_ => None)
+  let (isZipValid, setIsZipValid) = React.useState(_ => None)
+  let (isCardSupported, setIsCardSupported) = React.useState(_ => None)
+
+  let detectedCardBrand = getCardBrand(cardNumber)
+  let isNotBancontact = selectedOption !== "bancontact_card" && detectedCardBrand == ""
+  let (cardBrand, setCardBrand) = React.useState(_ =>
+    !showPaymentMethodsScreen && isNotBancontact ? cardScheme : detectedCardBrand
+  )
+
+  let stateCardBrand = cardBrand
+  let derivedCardBrand = CardUtils.getCardBrandFromStates(
+    cardBrand,
+    cardScheme,
+    showPaymentMethodsScreen,
+  )
+  let cardBrand =
+    cardBrandOverride === "" ? derivedCardBrand : cardBrandOverride->CardUtils.normalizeCardBrand
+
+  // Nothing in the card element's tree writes the scheme atom, so the brand is lost here and the CVC
+  // rules fall back to the permissive default. CVC-scoped: widening cardBrand changes the payload.
+  let cardBrandForCvc = switch (cardBrand, paymentType) {
+  | ("", CardThemeType.Card) => stateCardBrand
+  | _ => cardBrand
+  }
+  let maxCVCLength = CardValidations.getobjFromCardPattern(cardBrandForCvc).maxCVCLength
+  let supportedCardBrands = React.useMemo(() => {
+    switch forwardedSupportedCardBrands {
+    | Some(brands) => Some(brands)
+    | None => paymentMethodListValue->PaymentUtils.getSupportedCardBrands
+    }
+  }, (paymentMethodListValue, forwardedSupportedCardBrands))
+
+  let maxCardLength = React.useMemo(() => {
+    getMaxLength(cardBrand)
+  }, (cardNumber, cardScheme, cardBrand, showPaymentMethodsScreen))
+
+  React.useEffect(() => {
+    // The raw split-card iframe does not own the merchant's configured card
+    // networks. ParentCardComponent sends the authoritative support result.
+    if !enableExternalCardSupport {
+      setIsCardSupported(_ =>
+        PaymentUtils.checkIsCardSupported(cardNumber, cardBrand, supportedCardBrands)
+      )
+    }
+    None
+  }, (supportedCardBrands, cardNumber, cardBrand, enableExternalCardSupport))
+
+  let cardType = React.useMemo1(() => {
+    cardBrand->getCardType
+  }, [cardBrand])
+
+  // maxLength only constrains new input, so a CVC entered before the brand was known has to be
+  // re-judged against it, by the same rule as a blur: narrowing invalidates it, widening restores it.
+  React.useEffect1(() => {
+    if (
+      cvcNumber->String.length > 0 &&
+        cvcNumberInRange(cvcNumber, cardBrandForCvc)->Array.includes(true)
+    ) {
+      setIsCVCValid(_ => Some(true))
+    } else if cvcNumber->String.length == 0 {
+      setIsCVCValid(_ => None)
+    } else {
+      setIsCVCValid(_ => Some(false))
+    }
+    None
+  }, [cardBrandForCvc])
+
+  React.useEffect(() => {
+    if (
+      cvcNumberInRange(cvcNumber, cardBrandForCvc)->Array.includes(true) &&
+        cvcNumber->String.length == maxCVCLength
+    ) {
+      blurRef(cvcRef)
+    }
+    None
+  }, (cvcNumber, cardNumber))
+
+  React.useEffect(() => {
+    setCvcNumber(_ => "")
+    setCardExpiry(_ => "")
+    setIsExpiryValid(_ => None)
+    setIsCVCValid(_ => None)
+    None
+  }, [showPaymentMethodsScreen])
+
+  React.useEffect(() => {
+    if !isCoBadgedCardDetectedOnce.current {
+      setCvcNumber(_ => "")
+      setCardExpiry(_ => "")
+      setIsExpiryValid(_ => None)
+      setIsCVCValid(_ => None)
+    }
+    prevCardBrandRef.current = cardBrand
+    None
+  }, [cardBrand])
+
+  React.useEffect(() => {
+    setCvcNumber(_ => "")
+    setIsCVCValid(_ => None)
+    setCvcError(_ => "")
+    setCardError(_ => "")
+    setExpiryError(_ => "")
+    None
+  }, (paymentToken.paymentToken, showPaymentMethodsScreen))
+
+  let changeCardNumber = ev => {
+    let val = ReactEvent.Form.target(ev)["value"]
+    logInputChangeInfo("cardNumber", logger)
+    let card = val->formatCardNumber(cardType)
+    let clearValue = card->CardValidations.clearSpaces
+    let isCardSupportedAndValid = if enableExternalCardSupport {
+      CardUtils.cardValid(clearValue, cardBrand) && isCardSupported->Option.getOr(false)
+    } else {
+      PaymentUtils.checkIsCardSupported(clearValue, cardBrand, supportedCardBrands)->Option.getOr(
+        false,
+      )
+    }
+
+    setCardValid(clearValue, cardBrand, setIsCardValid)
+
+    if focusCardValid(clearValue, cardBrand) && isCardSupportedAndValid {
+      handleInputFocus(~currentRef=cardRef, ~destinationRef=expiryRef)
+    }
+    if card->String.length > 6 && cardBrand->pincodeVisibility {
+      setDisplayPincode(_ => true)
+    } else if card->String.length < 8 {
+      setDisplayPincode(_ => false)
+    }
+    setCardNumber(_ => card)
+    if card->String.length == 0 && prevCardBrandRef.current !== "" {
+      setCvcNumber(_ => "")
+      setCardExpiry(_ => "")
+      setIsExpiryValid(_ => None)
+      setIsCVCValid(_ => None)
+      setIsCardValid(_ => Some(false))
+    }
+
+    triggerOnCardNumberChange(~cardNumber=clearValue, ~isCardSupportedAndValid)
+  }
+
+  let changeCardExpiry = ev => {
+    let val = ReactEvent.Form.target(ev)["value"]
+    logInputChangeInfo("cardExpiry", logger)
+    let formattedExpiry = val->CardValidations.formatCardExpiryNumber
+    if isExipryValid(formattedExpiry) {
+      handleInputFocus(~currentRef=expiryRef, ~destinationRef=cvcRef)
+      CardUtils.emitExpiryDate(formattedExpiry, ~targetOrigin=parentURL)
+    }
+    setExpiryValid(formattedExpiry, setIsExpiryValid)
+    setCardExpiry(_ => formattedExpiry)
+  }
+
+  let changeCVCNumber = ev => {
+    let val = ReactEvent.Form.target(ev)["value"]
+    logInputChangeInfo("cardCVC", logger)
+    let cvc = val->CardValidations.formatCVCNumber(cardBrandForCvc)
+    setCvcNumber(_ => cvc)
+    if cvc->String.length > 0 && cvcNumberInRange(cvc, cardBrandForCvc)->Array.includes(true) {
+      zipRef.current->Nullable.toOption->Option.forEach(input => input->focus)->ignore
+    }
+
+    if cvc->String.length > 0 && cvcNumberInRange(cvc, cardBrandForCvc)->Array.includes(true) {
+      setIsCVCValid(_ => Some(true))
+    } else {
+      setIsCVCValid(_ => None)
+    }
+  }
+
+  let changeZipCode = ev => {
+    let val = ReactEvent.Form.target(ev)["value"]
+    logInputChangeInfo("zipCode", logger)
+    setZipCode(_ => val)
+  }
+
+  let onZipCodeKeyDown = ev => {
+    commonKeyDownEvent(ev, zipRef, cvcRef, zipCode, cvcNumber, setCvcNumber)
+  }
+  let onCvcKeyDown = ev => {
+    commonKeyDownEvent(ev, cvcRef, expiryRef, cvcNumber, cardExpiry, setCardExpiry)
+  }
+  let onExpiryKeyDown = ev => {
+    commonKeyDownEvent(ev, expiryRef, cardRef, cardExpiry, cardNumber, setCardNumber)
+  }
+  React.useEffect0(() => {
+    open Utils
+    let handleFun = (ev: Window.event) => {
+      if ev.source === iframeParent && (parentURL === "*" || ev.origin === parentURL) {
+        let json = ev.data->safeParse
+        let dict = json->Utils.getDictFromJson
+        if dict->Dict.get("doBlur")->Option.isSome {
+          if logControlEvents {
+            logger.setLogInfo(~value="doBlur Triggered", ~eventName=BLUR)
+          }
+          setBlurState(_ => true)
+        } else if dict->Dict.get("doFocus")->Option.isSome {
+          if logControlEvents {
+            logger.setLogInfo(~value="doFocus Triggered", ~eventName=FOCUS)
+          }
+          cardRef.current->Nullable.toOption->Option.forEach(input => input->focus)->ignore
+        } else if dict->Dict.get("doClearValues")->Option.isSome {
+          if logControlEvents {
+            logger.setLogInfo(~value="doClearValues Triggered", ~eventName=CLEAR)
+          }
+          //clear all values
+          setCardNumber(_ => "")
+          setCardExpiry(_ => "")
+          setCvcNumber(_ => "")
+          setIsCardValid(_ => None)
+          setCardError(_ => "")
+          setCvcError(_ => "")
+          setExpiryError(_ => "")
+          setIsExpiryValid(_ => None)
+          setIsCVCValid(_ => None)
+          resetEligibilityState()
+        }
+      }
+    }
+    handleMessage(handleFun, "Error in parsing sent Data")
+  })
+
+  let handleCardBlur = ev => {
+    let cardNumber = ReactEvent.Focus.target(ev)["value"]
+    if cardNumberInRange(cardNumber, cardBrand)->Array.includes(true) && calculateLuhn(cardNumber) {
+      if enableExternalCardSupport {
+        setIsCardValid(_ => Some(true))
+      } else {
+        setIsCardValid(_ =>
+          PaymentUtils.checkIsCardSupported(cardNumber, cardBrand, supportedCardBrands)
+        )
+      }
+    } else if cardNumber->String.length == 0 {
+      setIsCardValid(_ => Some(false))
+    } else {
+      setIsCardValid(_ => Some(false))
+    }
+  }
+
+  let handleExpiryBlur = ev => {
+    let cardExpiry = ReactEvent.Focus.target(ev)["value"]
+    if cardExpiry->String.length > 0 && getExpiryValidity(cardExpiry) {
+      setIsExpiryValid(_ => Some(true))
+    } else if cardExpiry->String.length == 0 {
+      setIsExpiryValid(_ => None)
+    } else {
+      setIsExpiryValid(_ => Some(false))
+    }
+  }
+
+  let handleCVCBlur = ev => {
+    let cvcNumber = ReactEvent.Focus.target(ev)["value"]
+    if (
+      cvcNumber->String.length > 0 &&
+        cvcNumberInRange(cvcNumber, cardBrandForCvc)->Array.includes(true)
+    ) {
+      setIsCVCValid(_ => Some(true))
+    } else if cvcNumber->String.length == 0 {
+      setIsCVCValid(_ => None)
+    } else {
+      setIsCVCValid(_ => Some(false))
+    }
+  }
+
+  let handleZipBlur = ev => {
+    let zipCode = ReactEvent.Focus.target(ev)["value"]
+    if zipCode === "" {
+      setIsZipValid(_ => Some(false))
+    } else {
+      setIsZipValid(_ => Some(true))
+    }
+  }
+
+  React.useEffect(() => {
+    let cardError = switch (
+      isCardSupported->Option.getOr(true),
+      isCardValid->Option.getOr(true),
+      cardNumber->String.length == 0,
+      cardEligibilityError,
+    ) {
+    | (_, _, _, Some(msg)) =>
+      EligibilityHelpers.getCardEligibilityErrorText(~cardEligibilityError=Some(msg), ~localeString)
+    | (_, _, true, None) => ""
+    | (true, true, _, None) => ""
+    | (true, _, _, None) => localeString.inValidCardErrorText
+    | _ => CardUtils.getCardBrandInvalidError(~cardBrand, ~localeString)
+    }
+    let cardError = isCardValid->Option.isSome ? cardError : ""
+    setCardError(_ => cardError)
+    None
+  }, (isCardValid, isCardSupported, cardNumber, cardEligibilityError, cardBrand))
+
+  React.useEffect(() => {
+    setCvcError(_ => isCVCValid->Option.getOr(true) ? "" : localeString.inCompleteCVCErrorText)
+    None
+  }, [isCVCValid])
+
+  React.useEffect(() => {
+    setExpiryError(_ =>
+      switch (isExpiryValid, isExpiryComplete(cardExpiry)) {
+      | (Some(true), true) => ""
+      | (Some(false), true) => localeString.pastExpiryErrorText
+      | (Some(_), false) => localeString.inCompleteExpiryErrorText
+      | (None, _) => ""
+      }
+    )
+    None
+  }, (isExpiryValid, isExpiryComplete(cardExpiry)))
+
+  React.useEffect(() => {
+    let validCardBrand = getFirstValidCardSchemeFromPML(
+      ~cardNumber,
+      ~enabledCardSchemes=supportedCardBrands->Option.getOr([]),
+    )
+    let newCardBrand = switch validCardBrand {
+    | Some(brand) => brand
+    | None => cardNumber->CardUtils.getCardBrand
+    }
+    setCardBrand(_ => newCardBrand)
+    None
+  }, [cardNumber])
+
+  let icon = React.useMemo(() => {
+    <CardSchemeComponent cardNumber paymentType cardBrand setCardBrand isCoBadgedCardDetectedOnce />
+  }, (cardType, paymentType, cardBrand, cardNumber))
+
+  let cardProps: CardUtils.cardProps = {
+    isCardValid,
+    setIsCardValid,
+    isCardSupported,
+    updateCardSupport: support => setIsCardSupported(_ => support),
+    cardNumber,
+    changeCardNumber,
+    handleCardBlur,
+    cardRef,
+    icon,
+    cardError,
+    setCardError,
+    maxCardLength,
+    cardBrand,
+    cardEligibilityError,
+    updateCardEligibilityError,
+    eligibilitySurchargeDetails,
+    eligibilityOfferDetails,
+    isEligibilityPending,
+  }
+
+  let expiryProps: CardUtils.expiryProps = {
+    isExpiryValid,
+    setIsExpiryValid,
+    cardExpiry,
+    changeCardExpiry,
+    handleExpiryBlur,
+    expiryRef,
+    onExpiryKeyDown,
+    expiryError,
+    setExpiryError,
+  }
+
+  let cvcProps: CardUtils.cvcProps = {
+    isCVCValid,
+    setIsCVCValid,
+    cvcNumber,
+    setCvcNumber,
+    changeCVCNumber,
+    handleCVCBlur,
+    cvcRef,
+    onCvcKeyDown,
+    cvcError,
+    setCvcError,
+    maxCVCLength,
+  }
+
+  let zipProps: CardUtils.zipProps = {
+    isZipValid,
+    setIsZipValid,
+    zipCode,
+    changeZipCode,
+    handleZipBlur,
+    zipRef,
+    onZipCodeKeyDown,
+    displayPincode,
+  }
+
+  {cardProps, expiryProps, cvcProps, zipProps, blurState}
+}

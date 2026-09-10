@@ -1,0 +1,728 @@
+open Utils
+@react.component
+let make = (~children, ~paymentMode, ~setIntegrateErrorError, ~logger, ~initTimestamp) => {
+  open JotaiAtoms
+  open JotaiAtomsV2
+
+  let (configAtom, setConfig) = Jotai.useAtom(configAtom)
+  let setIsConfigReady = Jotai.useSetAtom(isConfigReady)
+  let (keys, setKeys) = Jotai.useAtom(keys)
+  let (paymentMethodList, setPaymentMethodList) = Jotai.useAtom(paymentMethodList)
+  let setSdkConfigs = Jotai.useSetAtom(sdkConfigs)
+  let setSdkConfigsValue = Jotai.useSetAtom(PaymentUtils.sdkConfigsValue)
+  let setSessions = Jotai.useSetAtom(sessions)
+  let (options, setOptions) = Jotai.useAtom(elementOptions)
+  let (optionsPayment, setOptionsPayment) = Jotai.useAtom(optionAtom)
+  let setPaymentManagementList = Jotai.useSetAtom(paymentManagementList)
+  let setSessionId = Jotai.useSetAtom(sessionId)
+  let setBlockConfirm = Jotai.useSetAtom(isConfirmBlocked)
+  let setCustomPodUri = Jotai.useSetAtom(customPodUri)
+  let setIsGooglePayReady = Jotai.useSetAtom(isGooglePayReady)
+  let setTrustPayScriptStatus = Jotai.useSetAtom(trustPayScriptStatus)
+  let setIsApplePayReady = Jotai.useSetAtom(isApplePayReady)
+  let setIsSamsungPayReady = Jotai.useSetAtom(isSamsungPayReady)
+  let setUpdateSession = Jotai.useSetAtom(updateSession)
+  let setIsUpdateIntentLoading = Jotai.useSetAtom(isUpdateIntentLoading)
+  let (divH, setDivH) = React.useState(_ => 0.0)
+  let (launchTime, setLaunchTime) = React.useState(_ => 0.0)
+  let {paymentMethodOrder} = optionsPayment
+  let setPaymentMethodCollectOptions = Jotai.useSetAtom(paymentMethodCollectOptionAtom)
+  let url = RescriptReactRouter.useUrl()
+  let componentName = CardUtils.getQueryParamsDictforKey(url.search, "componentName")
+
+  let divRef = React.useRef(Nullable.null)
+
+  let {config} = configAtom
+  let {iframeId} = keys
+
+  let messageParentWindow = data => messageParentWindow(data, ~targetOrigin=keys.parentURL)
+
+  let setUserFullName = Jotai.useSetAtom(userFullName)
+  let setUserEmail = Jotai.useSetAtom(userEmailAddress)
+  let setUserAddressline1 = Jotai.useSetAtom(userAddressline1)
+  let setUserAddressline2 = Jotai.useSetAtom(userAddressline2)
+  let setUserAddressCity = Jotai.useSetAtom(userAddressCity)
+  let setUserAddressPincode = Jotai.useSetAtom(userAddressPincode)
+  let setUserAddressState = Jotai.useSetAtom(userAddressState)
+  let setUserAddressCountry = Jotai.useSetAtom(userAddressCountry)
+  let setCountry = Jotai.useSetAtom(userCountry)
+  let setIsCompleteCallbackUsed = Jotai.useSetAtom(isCompleteCallbackUsed)
+  let setIsPaymentButtonHandlerProvided = Jotai.useSetAtom(isPaymentButtonHandlerProvidedAtom)
+  let setIsTestMode = Jotai.useSetAtom(JotaiAtoms.isTestMode)
+  let setIsSavedCardCvcFlow = Jotai.useSetAtom(JotaiAtoms.isSavedCardCvcFlow)
+  let setCardCollectionMode = Jotai.useSetAtom(JotaiAtoms.cardCollectionMode)
+  let setCardBrand = Jotai.useSetAtom(JotaiAtoms.cardBrand)
+  let setSupportedCardBrands = Jotai.useSetAtom(JotaiAtoms.supportedCardBrands)
+  let setSavedCardBrand = Jotai.useSetAtom(JotaiAtoms.savedCardBrand)
+  let setIsBancontactCardFlow = Jotai.useSetAtom(JotaiAtoms.isBancontactCardFlow)
+  let setCardFlowType = Jotai.useSetAtom(JotaiAtoms.cardFlowType)
+  let setOptionsJson = Jotai.useSetAtom(optionsJsonAtom)
+  let setPaymentOptionsJson = Jotai.useSetAtom(paymentOptionsJsonAtom)
+
+  let optionsCallback = (optionsPayment: PaymentType.options) => {
+    [
+      (optionsPayment.defaultValues.billingDetails.name, setUserFullName),
+      (optionsPayment.defaultValues.billingDetails.email, setUserEmail),
+      (optionsPayment.defaultValues.billingDetails.address.line1, setUserAddressline1),
+      (optionsPayment.defaultValues.billingDetails.address.line2, setUserAddressline2),
+      (optionsPayment.defaultValues.billingDetails.address.city, setUserAddressCity),
+      (optionsPayment.defaultValues.billingDetails.address.postal_code, setUserAddressPincode),
+      (optionsPayment.defaultValues.billingDetails.address.state, setUserAddressState),
+      (optionsPayment.defaultValues.billingDetails.address.country, setUserAddressCountry),
+    ]->Array.forEach(val => {
+      let (value, setValue) = val
+      if value != "" {
+        setValue(prev => {
+          ...prev,
+          value,
+        })
+      }
+    })
+    if optionsPayment.defaultValues.billingDetails.address.country === "" {
+      let clientTimeZone = CardUtils.dateTimeFormat().resolvedOptions().timeZone
+      let clientCountry = getClientCountry(clientTimeZone)
+      setUserAddressCountry(prev => {
+        ...prev,
+        value: clientCountry.countryName,
+      })
+      setCountry(_ => clientCountry.countryName)
+    } else {
+      setUserAddressCountry(prev => {
+        ...prev,
+        value: optionsPayment.defaultValues.billingDetails.address.country,
+      })
+      setCountry(_ => optionsPayment.defaultValues.billingDetails.address.country)
+    }
+  }
+
+  let updateOptions = dict => {
+    let optionsDict = dict->getDictFromObj("options")
+    setOptionsJson(_ => optionsDict->JSON.Encode.object)
+    switch paymentMode->CardThemeType.getPaymentMode {
+    | CardNumberElement
+    | CardExpiryElement
+    | CardCVCElement
+    | Card => {
+        setOptions(_ => ElementType.itemToObjMapper(optionsDict, logger))
+        let subscriptionEvents = SubscriptionEventTypes.getSubscriptionEvents(
+          optionsDict,
+          "subscriptionEvents",
+        )
+        setOptionsPayment(prev => {...prev, subscriptionEvents})
+      }
+    | PaymentMethodCollectElement => {
+        let paymentMethodCollectOptions = PaymentMethodCollectUtils.itemToObjMapper(optionsDict)
+        setPaymentMethodCollectOptions(_ => paymentMethodCollectOptions)
+      }
+    | GooglePayElement
+    | PayPalElement
+    | ApplePayElement
+    | SamsungPayElement
+    | KlarnaElement
+    | PazeElement
+    | ExpressCheckoutElement
+    | PaymentMethodsManagement
+    | PaymentMethodsSDK
+    | Payment => {
+        let paymentOptions = PaymentType.itemToObjMapper(optionsDict, logger)
+        setOptionsPayment(_ => paymentOptions)
+        optionsCallback(paymentOptions)
+      }
+    | _ => ()
+    }
+  }
+
+  let setConfigs = async (dict, themeValues: ThemeImporter.themeDataModule) => {
+    try {
+      let paymentOptions = dict->getDictFromObj("paymentOptions")
+      let optionsDict = dict->getDictFromObj("options")
+      let (default, defaultRules) = (themeValues.default, themeValues.defaultRules)
+      let config = CardTheme.itemToObjMapper(paymentOptions, default, defaultRules, logger)
+      let optionsLocaleString = getWarningString(optionsDict, "locale", "", ~logger)
+      let optionsAppearance = CardTheme.getAppearance(
+        "appearance",
+        optionsDict,
+        default,
+        defaultRules,
+        logger,
+      )
+      let appearance =
+        optionsAppearance == CardTheme.defaultAppearance ? config.appearance : optionsAppearance
+      let requestedLocale = optionsLocaleString == "" ? config.locale : optionsLocaleString
+      let resolvedLocale = requestedLocale === "auto" ? Window.Navigator.language : requestedLocale
+      let localeString = await CardTheme.getLocaleObject(requestedLocale)
+      let constantString = await CardTheme.getConstantStringsObject()
+      let _ = await S3Utils.initializeCountryData(~locale=resolvedLocale, ~logger)
+      setConfig(_ => {
+        config: {
+          appearance,
+          locale: resolvedLocale,
+          fonts: config.fonts,
+          clientSecret: config.clientSecret,
+          pmSessionId: config.pmSessionId,
+          loader: config.loader,
+          sdkAuthorization: config.sdkAuthorization,
+        },
+        themeObj: appearance.variables,
+        localeString,
+        constantString,
+        showLoader: config.loader == Auto || config.loader == Always,
+      })
+    } catch {
+    | _ => ()
+    }
+    setIsConfigReady(_ => true)
+  }
+
+  let updateRedirectionFlags = UtilityHooks.useUpdateRedirectionFlags()
+
+  React.useEffect0(() => {
+    messageParentWindow([("iframeMounted", true->JSON.Encode.bool)])
+    messageParentWindow([
+      ("applePayMounted", true->JSON.Encode.bool),
+      ("componentName", componentName->JSON.Encode.string),
+    ])
+    logger.setLogInitiated()
+    let updatedState: PaymentType.loadType = switch paymentMethodList {
+    | Loading => checkPriorityList(paymentMethodOrder) ? SemiLoaded : Loading
+    | x => x
+    }
+    let finalLoadLatency = if launchTime <= 0.0 {
+      0.0
+    } else {
+      Date.now() -. launchTime
+    }
+    switch updatedState {
+    | Loaded(_) =>
+      logger.setLogInfo(~value="Loaded", ~eventName=LOADER_CHANGED, ~latency=finalLoadLatency)
+    | Loading =>
+      logger.setLogInfo(~value="Loading", ~eventName=LOADER_CHANGED, ~latency=finalLoadLatency)
+    | SemiLoaded => {
+        setPaymentMethodList(_ => updatedState)
+        logger.setLogInfo(~value="SemiLoaded", ~eventName=LOADER_CHANGED, ~latency=finalLoadLatency)
+      }
+    | LoadError(x) =>
+      logger.setLogError(
+        ~value="LoadError: " ++ x->JSON.stringify,
+        ~eventName=LOADER_CHANGED,
+        ~latency=finalLoadLatency,
+      )
+    }
+    Window.addEventListener("click", ev =>
+      handleOnClickPostMessage(~targetOrigin=keys.parentURL, ev)
+    )
+    Some(
+      () => {
+        Window.removeEventListener("click", ev =>
+          handleOnClickPostMessage(~targetOrigin=keys.parentURL, ev)
+        )
+      },
+    )
+  })
+
+  React.useEffect(() => {
+    CardUtils.generateFontsLink(config.fonts)
+    let dict = config.appearance.rules->getDictFromJson
+    if dict->Dict.toArray->Array.length > 0 {
+      generateStyleSheet("", dict, "themestyle")
+    }
+    switch paymentMode->CardThemeType.getPaymentMode {
+    | Payment
+    | PaymentMethodsSDK => ()
+    | _ =>
+      let styleClass = [
+        ("input-base", options.style.base->getDictFromJson),
+        ("input-complete", options.style.complete->getDictFromJson),
+        ("input-invalid", options.style.invalid->getDictFromJson),
+        ("input-empty", options.style.empty->getDictFromJson),
+      ]
+      styleClass
+      ->Array.map(item => {
+        let (class, dict) = item
+        if dict->Dict.toArray->Array.length > 0 {
+          generateStyleSheet(class, dict, "widgetstyle")->ignore
+        }
+      })
+      ->ignore
+    }
+    None
+  }, [config])
+
+  React.useEffect(() => {
+    open Promise
+    let handleFun = (ev: Window.event) => {
+      let json = ev.data->safeParse
+      try {
+        let dict = json->getDictFromJson
+        if dict->getDictIsSome("paymentElementCreate") {
+          // Set iframeId for ALL elements including individual card elements (cardNumber, cardExpiry, cardCvc)
+          if dict->getDictIsSome("iframeId") {
+            setKeys(prev => {
+              ...prev,
+              iframeId: dict->getString("iframeId", "no-element"),
+            })
+          }
+          if (
+            dict
+            ->Dict.get("paymentElementCreate")
+            ->Option.flatMap(JSON.Decode.bool)
+            ->Option.getOr(false)
+          ) {
+            if (
+              dict->Dict.get("otherElements")->Option.flatMap(JSON.Decode.bool)->Option.getOr(false)
+            ) {
+              updateOptions(dict)
+            } else {
+              let sdkSessionId = dict->getString("sdkSessionId", "no-element")
+              logger.setSessionId(sdkSessionId)
+              if dict->Dict.get("loggerSource")->Option.isSome {
+                logger.setSource(dict->getString("loggerSource", "hyper_payment"))
+              }
+              if GlobalVars.isInteg {
+                setBlockConfirm(_ => dict->getBool("blockConfirm", false))
+              }
+              setCustomPodUri(_ => dict->getString("customPodUri", ""))
+              setSessionId(_ => {
+                sdkSessionId
+              })
+              if dict->getDictIsSome("publishableKey") {
+                let publishableKey = dict->getString("publishableKey", "")
+                logger.setMerchantId(publishableKey)
+              }
+              if dict->getDictIsSome("analyticsMetadata") {
+                let metadata = dict->getJsonObjectFromDict("analyticsMetadata")
+                logger.setMetadata(metadata)
+              }
+
+              if dict->getDictIsSome("onCompleteDoThisUsed") {
+                let isCallbackUsedVal = dict->Utils.getBool("onCompleteDoThisUsed", false)
+                setIsCompleteCallbackUsed(_ => isCallbackUsedVal)
+              }
+              if dict->getDictIsSome("isPaymentButtonHandlerProvided") {
+                let isSDKClick = dict->Utils.getBool("isPaymentButtonHandlerProvided", false)
+                setIsPaymentButtonHandlerProvided(_ => isSDKClick)
+              }
+              if dict->getDictIsSome("paymentOptions") {
+                let paymentOptions = dict->getDictFromObj("paymentOptions")
+                setPaymentOptionsJson(_ => paymentOptions->JSON.Encode.object)
+
+                let clientSecret = getWarningString(paymentOptions, "clientSecret", "", ~logger)
+                let pmSessionId = getWarningString(paymentOptions, "pmSessionId", "", ~logger)
+                let sdkAuthorization = getString(paymentOptions, "sdkAuthorization", "")
+                setKeys(prev => {
+                  ...prev,
+                  clientSecret: Some(clientSecret),
+                  sdkAuthorization: Some(sdkAuthorization),
+                  pmSessionId,
+                })
+                logger.setClientSecret(clientSecret)
+                logger.setSdkAuthorization(sdkAuthorization)
+
+                // Update top redirection atom
+                updateRedirectionFlags(paymentOptions)
+
+                switch getThemePromise(paymentOptions) {
+                | Some(promise) =>
+                  promise
+                  ->then(res => {
+                    dict->setConfigs(res)
+                  })
+                  ->catch(_ => {
+                    dict->setConfigs({
+                      default: DefaultTheme.default,
+                      defaultRules: DefaultTheme.defaultRules,
+                    })
+                  })
+                | None =>
+                  dict->setConfigs({
+                    default: DefaultTheme.default,
+                    defaultRules: DefaultTheme.defaultRules,
+                  })
+                }->ignore
+              }
+              let newLaunchTime = dict->getFloat("launchTime", 0.0)
+              setLaunchTime(_ => newLaunchTime)
+              let initLoadlatency = Date.now() -. newLaunchTime
+              logger.setLogInfo(
+                ~value=Window.hrefWithoutSearch,
+                ~eventName=APP_RENDERED,
+                ~latency=initLoadlatency,
+              )
+              [
+                ("iframeId", "no-element"->JSON.Encode.string),
+                ("publishableKey", ""->JSON.Encode.string),
+                ("paymentId", ""->JSON.Encode.string),
+                ("parentURL", "*"->JSON.Encode.string),
+                ("sdkHandleOneClickConfirmPayment", true->JSON.Encode.bool),
+              ]->Array.forEach(keyPair => {
+                dict->CommonHooks.updateKeys(keyPair, setKeys)
+              })
+              let renderLatency = Date.now() -. initTimestamp
+              logger.setLogInfo(
+                ~eventName=PAYMENT_OPTIONS_PROVIDED,
+                ~latency=renderLatency,
+                ~value="",
+              )
+              updateOptions(dict)
+            }
+          } else if dict->getDictIsSome("paymentOptions") {
+            let paymentOptions = dict->getDictFromObj("paymentOptions")
+            setPaymentOptionsJson(_ => paymentOptions->JSON.Encode.object)
+
+            let clientSecret = getWarningString(paymentOptions, "clientSecret", "", ~logger)
+            let pmSessionId = getWarningString(paymentOptions, "pmSessionId", "", ~logger)
+            let sdkAuthorization = getString(paymentOptions, "sdkAuthorization", "")
+            setKeys(prev => {
+              ...prev,
+              clientSecret: Some(clientSecret),
+              sdkAuthorization: Some(sdkAuthorization),
+              pmSessionId,
+            })
+            logger.setClientSecret(clientSecret)
+            logger.setSdkAuthorization(sdkAuthorization)
+
+            // Update top redirection atom
+            updateRedirectionFlags(paymentOptions)
+
+            switch getThemePromise(paymentOptions) {
+            | Some(promise) =>
+              promise
+              ->then(res => {
+                dict->setConfigs(res)
+              })
+              ->catch(_ => {
+                dict->setConfigs({
+                  default: DefaultTheme.default,
+                  defaultRules: DefaultTheme.defaultRules,
+                })
+              })
+
+            | None =>
+              dict->setConfigs({
+                default: DefaultTheme.default,
+                defaultRules: DefaultTheme.defaultRules,
+              })
+            }->ignore
+          }
+        } else if dict->getDictIsSome("paymentElementsUpdate") {
+          updateOptions(dict)
+        } else if dict->getDictIsSome("ElementsUpdate") {
+          logger.setLogInfo(~value="SDK Credentials Received from Loader", ~eventName=UPDATE_SDK)
+          let optionsDict = dict->getDictFromObj("options")
+          setPaymentOptionsJson(prev => {
+            let updatedPaymentOptions = prev->getDictFromJson->Dict.copy
+            ["locale", "appearance", "clientSecret", "sdkAuthorization"]->Array.forEach(
+              key =>
+                switch optionsDict->Dict.get(key) {
+                | Some(val) => updatedPaymentOptions->Dict.set(key, val)
+                | None => ()
+                },
+            )
+            updatedPaymentOptions->JSON.Encode.object
+          })
+          let clientSecret = dict->Dict.get("clientSecret")
+          switch clientSecret {
+          | Some(val) =>
+            setKeys(prev => {
+              ...prev,
+              clientSecret: Some(val->getStringFromJson("")),
+            })
+            setConfig(prev => {
+              ...prev,
+              config: {
+                ...prev.config,
+                clientSecret: val->getStringFromJson(""),
+              },
+            })
+          | None => ()
+          }
+          let sdkAuthorization = dict->Dict.get("sdkAuthorization")
+          switch sdkAuthorization {
+          | Some(val) =>
+            setKeys(prev => {
+              ...prev,
+              sdkAuthorization: Some(val->getStringFromJson("")),
+            })
+            setConfig(prev => {
+              ...prev,
+              config: {
+                ...prev.config,
+                sdkAuthorization: val->getStringFromJson(""),
+              },
+            })
+          | None => ()
+          }
+          if optionsDict->Dict.keysToArray->Array.length > 0 {
+            switch getThemePromise(optionsDict) {
+            | Some(promise) =>
+              promise
+              ->then(res => {
+                dict->setConfigs(res)
+              })
+              ->catch(_ => {
+                dict->setConfigs({
+                  default: DefaultTheme.default,
+                  defaultRules: DefaultTheme.defaultRules,
+                })
+              })
+
+            | None =>
+              dict->setConfigs({
+                default: DefaultTheme.default,
+                defaultRules: DefaultTheme.defaultRules,
+              })
+            }->ignore
+          }
+        }
+        if dict->Dict.get("isTestMode")->Option.isSome {
+          let isTestMode = dict->Utils.getBool("isTestMode", false)
+          setIsTestMode(_ => isTestMode)
+        }
+
+        // Saved-card (return user) CVC iframe is mounted by ParentCardComponent
+        // with isSavedCardCvcFlow=true in its paymentElementCreate mount message;
+        // PaymentMethodsSDK reads this atom to render only the vault CVC field.
+        if dict->Dict.get("isSavedCardCvcFlow")->Option.isSome {
+          setIsSavedCardCvcFlow(_ => dict->Utils.getBool("isSavedCardCvcFlow", false))
+          switch dict->getString("endpoint", "") {
+          | "" => ()
+          | endpoint => ApiEndpoint.setApiEndPoint(endpoint)
+          }
+        }
+        if dict->Dict.get("cardCollectionMode")->Option.isSome {
+          setCardCollectionMode(_ =>
+            switch dict->getString("cardCollectionMode", "tokenise") {
+            | "raw" => RawEmit
+            | _ => Tokenise
+            }
+          )
+        }
+        if dict->Dict.get("savedCardBrand")->Option.isSome {
+          let savedCardBrand = dict->getString("savedCardBrand", "")->CardUtils.normalizeCardBrand
+          setCardBrand(_ => savedCardBrand)
+          setSavedCardBrand(_ => savedCardBrand)
+        }
+        if dict->Dict.get("supportedCardBrands")->Option.isSome {
+          setSupportedCardBrands(_ => Some(dict->getStrArray("supportedCardBrands")))
+        }
+        if dict->Dict.get("isBancontactCardFlow")->Option.isSome {
+          setIsBancontactCardFlow(_ => dict->Utils.getBool("isBancontactCardFlow", false))
+        }
+        if dict->Dict.get("cardFlowType")->Option.isSome {
+          setCardFlowType(_ =>
+            dict->getString("cardFlowType", "payment")->CardThemeType.getPaymentMode
+          )
+        }
+        if dict->getDictIsSome("sessions") {
+          setSessions(_ => Loaded(dict->getJsonObjectFromDict("sessions")))
+        }
+        if dict->getDictIsSome("sessionUpdate") {
+          setUpdateSession(_ => {
+            dict->getJsonObjectFromDict("sessionUpdate")->JSON.Decode.bool->Option.getOr(false)
+          })
+        }
+        if dict->getDictIsSome("isReadyToPay") {
+          setIsGooglePayReady(_ =>
+            dict->getJsonObjectFromDict("isReadyToPay")->JSON.Decode.bool->Option.getOr(false)
+          )
+        }
+        if dict->getDictIsSome("trustPayScriptStatus") {
+          setTrustPayScriptStatus(_ => {
+            switch dict->getString("trustPayScriptStatus", "") {
+            | "loading" => Loading
+            | "loaded" => Loaded
+            | "failed" => Failed
+            | _ => NotLoaded
+            }
+          })
+        }
+        if dict->getDictIsSome("isSamsungPayReady") {
+          setIsSamsungPayReady(_ => dict->getBool("isSamsungPayReady", false))
+        }
+        if (
+          dict->getDictIsSome("customBackendUrl") &&
+            dict
+            ->getString("customBackendUrl", "")
+            ->String.length > 0
+        ) {
+          if dict->getDictIsSome("endpoint") {
+            switch dict->getString("endpoint", "") {
+            | "" => ()
+            | endpoint => ApiEndpoint.setApiEndPoint(endpoint)
+            }
+          }
+        }
+
+        // Single clientList message carries both the merchant's enabled
+        // payment methods (payment_methods_enabled) and the customer's
+        // saved payment methods (customer_payment_methods). When the
+        // merchant disables saved payment methods, customer_payment_methods
+        // is already stripped to an empty array at the source
+        // (forwardPaymentMethodsToIframe), so this handler doesn't need its
+        // own send-side gate — it just decodes whatever arrived.
+        if dict->getDictIsSome("clientList") {
+          let clientListJson = dict->getJsonObjectFromDict("clientList")
+          let listDict = clientListJson->getDictFromJson
+          if optionsPayment.business.name === "" {
+            setOptionsPayment(prev => {
+              ...prev,
+              business: {
+                name: listDict
+                ->getDictFromDict("intent_data")
+                ->getString("merchant_name", ""),
+              },
+            })
+          }
+          let finalLoadLatency = if launchTime <= 0.0 {
+            0.0
+          } else {
+            Date.now() -. launchTime
+          }
+          let isClientListError =
+            clientListJson == Dict.make()->JSON.Encode.object ||
+              listDict->Dict.get("error")->Option.isSome
+
+          let updatedState: PaymentType.loadType = isClientListError
+            ? LoadError(clientListJson)
+            : {
+                let isNonEmptyPaymentMethodList =
+                  listDict->getArray("payment_methods_enabled")->Array.length > 0
+                isNonEmptyPaymentMethodList ? Loaded(clientListJson) : LoadError(clientListJson)
+              }
+
+          let evalMethodsList = () =>
+            switch updatedState {
+            | Loaded(_) =>
+              logger.setLogInfo(
+                ~value="Loaded",
+                ~eventName=LOADER_CHANGED,
+                ~latency=finalLoadLatency,
+              )
+            | LoadError(x) =>
+              logger.setLogError(
+                ~value="LoadError: " ++ x->JSON.stringify,
+                ~eventName=LOADER_CHANGED,
+                ~latency=finalLoadLatency,
+              )
+            | _ => ()
+            }
+
+          setPaymentMethodList(_ => updatedState)
+
+          let customerPaymentMethods =
+            dict->PaymentType.createCustomerObjArrFromClientList("clientList")
+          setOptionsPayment(prev => {
+            ...prev,
+            customerPaymentMethods,
+          })
+
+          // Payment-methods-list and customer-payment-methods data both
+          // arrive together in a single clientList response, so this is
+          // evaluated once using the freshly-computed customerPaymentMethods
+          // above. Logging it once per data source (as when they arrived as
+          // two independent postMessages) would double-log this event.
+          if !optionsPayment.displaySavedPaymentMethods {
+            evalMethodsList()
+          } else {
+            switch customerPaymentMethods {
+            | LoadingSavedCards => ()
+            | LoadedSavedCards(list, _) =>
+              list->Array.length > 0
+                ? logger.setLogInfo(
+                    ~value="Loaded",
+                    ~eventName=LOADER_CHANGED,
+                    ~latency=finalLoadLatency,
+                  )
+                : evalMethodsList()
+            | NoResult(_) => evalMethodsList()
+            }
+          }
+        }
+        if dict->getDictIsSome("paymentManagementMethods") {
+          let paymentManagementMethods =
+            dict->UnifiedHelpersV2.createPaymentsObjArr("paymentManagementMethods")
+          setPaymentManagementList(_ => paymentManagementMethods)
+        }
+        if dict->getDictIsSome("sdkConfigs") {
+          let sdkConfigsJson = dict->getJsonObjectFromDict("sdkConfigs")
+          let sdkConfigsDict = sdkConfigsJson->getDictFromJson
+          let isSdkConfigsError =
+            sdkConfigsJson == JSON.Encode.null ||
+            sdkConfigsJson == Dict.make()->JSON.Encode.object ||
+            sdkConfigsDict->Dict.get("error")->Option.isSome
+          let updatedState: PaymentType.loadType = isSdkConfigsError
+            ? LoadError(sdkConfigsJson)
+            : Loaded(sdkConfigsJson)
+          let finalLoadLatency = if launchTime <= 0.0 {
+            0.0
+          } else {
+            Date.now() -. launchTime
+          }
+          switch updatedState {
+          | Loaded(_) =>
+            logger.setLogInfo(
+              ~value="Loaded",
+              ~eventName=SDK_CONFIGS_CALL,
+              ~latency=finalLoadLatency,
+            )
+          | LoadError(x) =>
+            logger.setLogError(
+              ~value="LoadError: " ++ x->JSON.stringify,
+              ~eventName=SDK_CONFIGS_CALL,
+              ~latency=finalLoadLatency,
+            )
+          | _ => ()
+          }
+          setSdkConfigs(_ => updatedState)
+          if !isSdkConfigsError {
+            setSdkConfigsValue(_ => sdkConfigsJson->SdkConfigParser.itemToObjMapper)
+          }
+        }
+        if dict->Dict.get("applePayCanMakePayments")->Option.isSome {
+          setIsApplePayReady(_ => true)
+        }
+        if dict->Dict.get("applePaySessionObjNotPresent")->Option.isSome {
+          setIsApplePayReady(prev => prev && false)
+        }
+        if dict->Dict.get("updateIntentLoading")->Option.isSome {
+          let isLoading = dict->getBool("updateIntentLoading", false)
+          setIsUpdateIntentLoading(_ => isLoading)
+          if isLoading {
+            logger.setLogInfo(~value="Update Intent Loading Started", ~eventName=UPDATE_INTENT)
+          } else {
+            logger.setLogInfo(~value="Update Intent Loading Completed", ~eventName=UPDATE_INTENT)
+          }
+        }
+      } catch {
+      | _ => setIntegrateErrorError(_ => true)
+      }
+    }
+    handleMessage(handleFun, "Error in parsing sent Data")
+  }, (paymentMethodOrder, optionsPayment))
+
+  let observer = ResizeObserver.newResizerObserver(entries => {
+    entries
+    ->Array.map(item => {
+      setDivH(_ => item.contentRect.height)
+    })
+    ->ignore
+  })
+  switch divRef.current->Nullable.toOption {
+  | Some(r) => observer.observe(r)
+  | None => ()
+  }
+
+  React.useEffect(() => {
+    let iframeHeight = divH->Float.equal(0.0) ? divH : divH +. 1.0
+    messageParentWindow([
+      ("iframeHeight", iframeHeight->JSON.Encode.float),
+      ("iframeId", iframeId->JSON.Encode.string),
+    ])
+    None
+  }, (divH, iframeId))
+
+  <div ref={divRef->ReactDOM.Ref.domRef} className="relative">
+    <UpdateIntentOverlay />
+    children
+  </div>
+}

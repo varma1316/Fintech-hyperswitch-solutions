@@ -1,0 +1,44 @@
+node_modules
+.bsb.lock
+.merlin
+.netlify
+lib/bs
+lib/ocaml
+lib/watch.lock
+public/*.LICENSE.txt
+public/app.js
+public/app.css
+.DS_Store
+/dist/
+**/*.bs.js
+screenshots
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# yarn
+.pnp.*
+.yarn/*
+yarn.lock
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+dist
+user_data.sh
+
+# Sentry Auth Token
+.env.sentry-build-plugin
+
+# Sensitive credential files - DO NOT COMMIT
+cypress-tests/creds.json
+cypress-tests/test-credentials.json
+cypress-tests/test-credentials-*.json
+cypress-tests/cypress.env.json
+cypress-tests/.env.json
+Hyperswitch-React-Demo-App/.env

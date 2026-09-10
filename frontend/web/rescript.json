@@ -1,0 +1,30 @@
+{
+  "name": "orca-payment-page",
+  "jsx": {
+    "version": 4,
+    "mode": "classic"
+  },
+  "compiler-flags": ["-open RescriptCore"],
+  "sources": [
+    {
+      "dir": "src",
+      "subdirs": true
+    },
+    {
+      "dir": "shared-code/sdk-utils",
+      "subdirs" : true
+    }
+  ],
+  "suffix": ".bs.js",
+  "namespace": true,
+  "ppx-flags": [],
+  "package-specs": {
+    "module": "esmodule",
+    "in-source": true
+  },
+  "dependencies": [
+    "@rescript/react",
+    "@rescript/core",
+    "@glennsl/rescript-fetch"
+  ]
+}

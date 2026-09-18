@@ -178,6 +178,11 @@ resource "aws_iam_role_policy_attachment" "logging" {
   policy_arn = aws_iam_policy.backend_logging_policy.arn
 }
 
+resource "aws_iam_role_policy_attachment" "ecr_pull" {
+  role       = aws_iam_role.backend_service_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
 # ==============================================================================
 # IAM Instance Profile (for EC2 / self-managed worker nodes)
 # ==============================================================================

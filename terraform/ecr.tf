@@ -14,7 +14,7 @@ locals {
 }
 
 resource "aws_ecr_repository" "services" {
-  for_each             = toset(locals.backend_services)
+  for_each             = toset(local.backend_services)
   name                 = "${var.project_name}/${each.key}"
   image_tag_mutability = "MUTABLE"
 
@@ -37,7 +37,7 @@ resource "aws_ecr_repository" "services" {
 # ==============================================================================
 
 resource "aws_ecr_lifecycle_policy" "services" {
-  for_each   = toset(locals.backend_services)
+  for_each   = toset(local.backend_services)
   repository = aws_ecr_repository.services[each.key].name
 
   policy = jsonencode({

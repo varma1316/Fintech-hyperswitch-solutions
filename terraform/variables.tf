@@ -45,3 +45,65 @@ variable "s3_bucket_name" {
   description = "Name of the S3 bucket used for frontend hosting"
   default     = "hyperswitch-frontend-assets"
 }
+
+# --- EKS Cluster Variables ---
+variable "eks_cluster_name" {
+  type        = string
+  description = "Name of the Amazon EKS cluster"
+  default     = "hyperswitch-cluster"
+}
+
+variable "eks_cluster_version" {
+  type        = string
+  description = "Kubernetes version for the EKS cluster"
+  default     = "1.30"
+}
+
+variable "eks_node_instance_types" {
+  type        = list(string)
+  description = "EC2 instance types for EKS managed node group"
+  default     = ["t3.medium"]
+}
+
+variable "eks_node_desired_size" {
+  type        = number
+  description = "Desired number of worker nodes in the node group"
+  default     = 2
+}
+
+variable "eks_node_min_size" {
+  type        = number
+  description = "Minimum number of worker nodes in the node group"
+  default     = 1
+}
+
+variable "eks_node_max_size" {
+  type        = number
+  description = "Maximum number of worker nodes in the node group"
+  default     = 3
+}
+
+# --- RDS PostgreSQL Database Variables ---
+variable "db_instance_class" {
+  type        = string
+  description = "RDS DB instance class"
+  default     = "db.t3.micro"
+}
+
+variable "db_allocated_storage" {
+  type        = number
+  description = "Allocated storage size in GB for RDS PostgreSQL (10GB allocated)"
+  default     = 10
+}
+
+variable "db_name" {
+  type        = string
+  description = "Name of the default database created in RDS"
+  default     = "hyperswitch"
+}
+
+variable "db_username" {
+  type        = string
+  description = "Master username for RDS PostgreSQL instance"
+  default     = "postgresadmin"
+}

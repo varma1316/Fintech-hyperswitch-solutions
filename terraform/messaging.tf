@@ -108,8 +108,8 @@ resource "aws_sqs_queue_policy" "inventory" {
         Principal = {
           Service = "sns.amazonaws.com"
         }
-        Action   = "sqs:SendMessage"
-        Resource = aws_sqs_queue.inventory_queue.arn
+        Action    = "sqs:SendMessage"
+        Resource  = aws_sqs_queue.inventory_queue.arn
         Condition = {
           ArnEquals = {
             "aws:SourceArn" = aws_sns_topic.payment_events.arn
@@ -132,8 +132,8 @@ resource "aws_sqs_queue_policy" "notification" {
         Principal = {
           Service = "sns.amazonaws.com"
         }
-        Action   = "sqs:SendMessage"
-        Resource = aws_sqs_queue.notification_queue.arn
+        Action    = "sqs:SendMessage"
+        Resource  = aws_sqs_queue.notification_queue.arn
         Condition = {
           ArnEquals = {
             "aws:SourceArn" = aws_sns_topic.payment_events.arn

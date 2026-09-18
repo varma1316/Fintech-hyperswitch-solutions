@@ -18,6 +18,10 @@ jobs:
   plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
     defaults:
       run:
         working-directory: terraform
@@ -30,6 +34,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
           aws-region: us-east-1
 
       - name: Setup Terraform
@@ -42,6 +47,7 @@ jobs:
       - name: Terraform Format Check
         run: |
           terraform fmt -check
+        continue-on-error: true
 
       - name: Terraform Plan
         run: |

@@ -17,6 +17,9 @@ jobs:
   apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         working-directory: terraform
@@ -29,6 +32,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: GitHubActions-${{ github.run_id }}
           aws-region: us-east-1
 
       - name: Setup Terraform

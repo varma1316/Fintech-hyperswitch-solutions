@@ -92,8 +92,8 @@ variable "db_instance_class" {
 
 variable "db_allocated_storage" {
   type        = number
-  description = "Allocated storage size in GB for RDS PostgreSQL (10GB allocated)"
-  default     = 10
+  description = "Allocated storage size in GB for RDS PostgreSQL (AWS minimum 20 GB for gp3)"
+  default     = 20
 }
 
 variable "db_name" {

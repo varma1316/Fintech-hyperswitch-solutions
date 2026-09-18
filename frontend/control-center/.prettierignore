@@ -1,9 +1,0 @@
-CHANGELOG.md
-*euclid*
-*.res.js
-package-lock.json
-yarn.lock
-dist/
-coverage/
-public/
-.claude/

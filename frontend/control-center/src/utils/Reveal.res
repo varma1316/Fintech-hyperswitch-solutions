@@ -1,1 +1,0 @@
-type position = Top | Right

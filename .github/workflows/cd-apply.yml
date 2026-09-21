@@ -44,6 +44,11 @@ jobs:
           TF_BUCKET=$(echo -n "${{ secrets.TF_STATE_BUCKET }}" | tr -d '[:space:]')
           terraform init -backend-config="bucket=${TF_BUCKET}"
 
+      - name: Prepare StatefulSet Upgrade
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
+          kubectl delete statefulset -n monitoring prometheus-kube-prometheus-stack-prometheus loki --cascade=orphan || true
+
       - name: Terraform Apply
         run: |
           terraform apply -auto-approve
@@ -54,6 +59,10 @@ jobs:
           aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
           echo "=== PODS ==="
           kubectl get pods -A
+          echo "=== PERSISTENT VOLUME CLAIMS ==="
+          kubectl get pvc -A
+          echo "=== STORAGE CLASSES ==="
+          kubectl get sc
           echo "=== INGRESSES ==="
           kubectl get ingress -A
           echo "=== ALB GRAFANA HEALTH ==="

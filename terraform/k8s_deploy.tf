@@ -109,6 +109,30 @@ resource "helm_release" "aws_load_balancer_controller" {
 }
 
 # ------------------------------------------------------------------------------
+# 3b. Kubernetes StorageClass: gp3 (AWS EBS CSI Driver)
+# ------------------------------------------------------------------------------
+resource "kubernetes_storage_class_v1" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = "true"
+    }
+  }
+
+  storage_provisioner    = "ebs.csi.aws.com"
+  volume_binding_mode    = "WaitForFirstConsumer"
+  allow_volume_expansion = true
+
+  parameters = {
+    type = "gp3"
+  }
+
+  depends_on = [
+    aws_eks_addon.ebs_csi
+  ]
+}
+
+# ------------------------------------------------------------------------------
 # 4. Helm Release: Kube Prometheus Stack (Prometheus & Grafana)
 # ------------------------------------------------------------------------------
 resource "helm_release" "kube_prometheus_stack" {
@@ -129,7 +153,9 @@ resource "helm_release" "kube_prometheus_stack" {
 
   depends_on = [
     aws_eks_node_group.main,
-    kubernetes_namespace.namespaces["monitoring"]
+    kubernetes_namespace.namespaces["monitoring"],
+    aws_eks_addon.ebs_csi,
+    kubernetes_storage_class_v1.gp3
   ]
 }
 
@@ -154,7 +180,9 @@ resource "helm_release" "loki" {
 
   depends_on = [
     aws_eks_node_group.main,
-    kubernetes_namespace.namespaces["monitoring"]
+    kubernetes_namespace.namespaces["monitoring"],
+    aws_eks_addon.ebs_csi,
+    kubernetes_storage_class_v1.gp3
   ]
 }
 
@@ -179,7 +207,9 @@ resource "helm_release" "tempo" {
 
   depends_on = [
     aws_eks_node_group.main,
-    kubernetes_namespace.namespaces["monitoring"]
+    kubernetes_namespace.namespaces["monitoring"],
+    aws_eks_addon.ebs_csi,
+    kubernetes_storage_class_v1.gp3
   ]
 }
 

@@ -14,7 +14,15 @@ prometheus:
       limits:
         cpu: 1000m
         memory: 1536Mi
-    retention: 7d
+    retention: 7h
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
 
 grafana:
   enabled: true

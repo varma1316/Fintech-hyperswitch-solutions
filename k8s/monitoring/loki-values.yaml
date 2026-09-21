@@ -10,6 +10,11 @@ loki:
     replication_factor: 1
   storage:
     type: filesystem
+  compactor:
+    retention_enabled: true
+    delete_request_cancel_period: 0m
+  limits_config:
+    retention_period: 7h
   schemaConfig:
     configs:
       - from: 2024-01-01
@@ -30,7 +35,9 @@ singleBinary:
       cpu: 500m
       memory: 512Mi
   persistence:
-    enabled: false
+    enabled: true
+    size: 5Gi
+    storageClass: gp3
 
 backend:
   replicas: 0

@@ -12,7 +12,7 @@ on:
 
 permissions:
   id-token: write
-  contents: read
+  contents: write
 
 jobs:
   apply:
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-      contents: read
+      contents: write
     defaults:
       run:
         working-directory: terraform
@@ -47,6 +47,44 @@ jobs:
       - name: Terraform Apply
         run: |
           terraform apply -auto-approve
+
+      - name: Diagnostic Dump to diag branch
+        if: always()
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
+          cd ..
+          {
+            echo "=== KUBERNETES NAMESPACES ==="
+            kubectl get ns
+            echo ""
+            echo "=== ALL SERVICES ==="
+            kubectl get svc -A
+            echo ""
+            echo "=== ALL PODS ==="
+            kubectl get pods -A -o wide
+            echo ""
+            echo "=== ALL INGRESSES ==="
+            kubectl get ingress -A
+            echo ""
+            echo "=== TARGET GROUP BINDINGS ==="
+            kubectl get targetgroupbindings -A || true
+            echo ""
+            echo "=== DESCRIBE GRAFANA INGRESS ==="
+            kubectl describe ingress -n monitoring grafana-ingress || true
+            echo ""
+            echo "=== DESCRIBE HYPERSWITCH INGRESS ==="
+            kubectl describe ingress -n hyperswitch hyperswitch-ingress || true
+            echo ""
+            echo "=== AWS LOAD BALANCER CONTROLLER LOGS ==="
+            kubectl logs -n kube-system deployment/aws-load-balancer-controller --tail=150 || true
+          } > diag.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B diag
+          git add diag.txt
+          git commit -m "chore: cluster diagnostics dump [skip ci]" || true
+          git push -f origin diag || true
+
 
 
 

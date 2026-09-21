@@ -6,7 +6,9 @@
 prometheus:
   prometheusSpec:
     serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
     podMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelector: {}
     resources:
       requests:
         cpu: 200m

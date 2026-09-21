@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - 'terraform/**'
+      - 'k8s/**'
       - '.github/workflows/cd-apply.yml'
   workflow_dispatch:
 

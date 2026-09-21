@@ -118,6 +118,10 @@ resource "helm_release" "kube_prometheus_stack" {
   version          = "58.2.2"
   namespace        = "monitoring"
   create_namespace = false
+  wait             = false
+  timeout          = 600
+  cleanup_on_fail  = true
+  force_update     = true
 
   values = [
     file("${path.module}/../k8s/monitoring/kube-prometheus-stack-values.yaml")
@@ -139,6 +143,10 @@ resource "helm_release" "loki" {
   version          = "5.47.2"
   namespace        = "monitoring"
   create_namespace = false
+  wait             = false
+  timeout          = 600
+  cleanup_on_fail  = true
+  force_update     = true
 
   values = [
     file("${path.module}/../k8s/monitoring/loki-values.yaml")
@@ -157,9 +165,13 @@ resource "helm_release" "tempo" {
   name             = "tempo"
   repository       = "https://grafana.github.io/helm-charts"
   chart            = "tempo"
-  version          = "1.8.2"
+  version          = "1.24.4"
   namespace        = "monitoring"
   create_namespace = false
+  wait             = false
+  timeout          = 600
+  cleanup_on_fail  = true
+  force_update     = true
 
   values = [
     file("${path.module}/../k8s/monitoring/tempo-values.yaml")
@@ -181,6 +193,10 @@ resource "helm_release" "hyperswitch" {
   version          = "1.3.1"
   namespace        = "hyperswitch"
   create_namespace = false
+  wait             = false
+  timeout          = 600
+  cleanup_on_fail  = true
+  force_update     = true
 
   values = [
     file("${path.module}/../k8s/hyperswitch/values.yaml")

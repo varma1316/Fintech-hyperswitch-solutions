@@ -14,8 +14,35 @@ image:
 postgresql:
   enabled: false
 
+externalPostgresql:
+  enabled: true
+  primary:
+    host: "hyperswitch-postgres"
+    auth:
+      username: "hyperswitch"
+      database: "hyperswitch_db"
+      password:
+        _secretRef:
+          name: hyperswitch-secrets
+          key: DB_PASSWORD
+  readOnly:
+    enabled: false
+
 redis:
   enabled: false
+
+externalRedis:
+  enabled: true
+  host: "hyperswitch-redis"
+  auth:
+    enabled: false
+    username: ""
+    password: ""
+
+redisMiscConfig:
+  checkRedisIsUp:
+    initContainer:
+      enable: false
 
 kafka:
   enabled: false

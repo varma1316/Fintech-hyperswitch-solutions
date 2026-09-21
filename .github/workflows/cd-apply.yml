@@ -59,57 +59,14 @@ jobs:
         if: always()
         run: |
           aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
-          echo "Waiting 45 seconds for pod scheduling and PVC binding..."
-          sleep 45
-          cd ..
-          {
-            echo "=== TERRAFORM OUTPUT (LAST 150 LINES) ==="
-            cat /tmp/tf_apply.log | tail -n 150 || true
-            echo ""
-            echo "=== NODES ==="
-            kubectl get nodes -o wide || true
-            echo ""
-            echo "=== HELM RELEASES ==="
-            helm list -A || true
-            echo ""
-            echo "=== EKS ADDONS ==="
-            aws eks list-addons --cluster-name hyperswitch-cluster || true
-            aws eks describe-addon --cluster-name hyperswitch-cluster --addon-name aws-ebs-csi-driver || true
-            echo ""
-            echo "=== PODS ==="
-            kubectl get pods -A
-            echo ""
-            echo "=== PERSISTENT VOLUMES AND CLAIMS ==="
-            kubectl get pv -A
-            kubectl get pvc -A
-            echo ""
-            echo "=== STORAGE CLASSES ==="
-            kubectl get sc
-            echo ""
-            echo "=== PROMETHEUS POD EVENTS ==="
-            kubectl describe pod -n monitoring prometheus-kube-prometheus-stack-prometheus-0 | tail -n 30 || true
-            echo ""
-            echo "=== LOKI POD LOGS / EVENTS ==="
-            kubectl describe pod -n monitoring loki-0 | tail -n 30 || true
-            kubectl logs -n monitoring loki-0 --tail=30 || true
-            echo ""
-            echo "=== TEMPO POD LOGS / EVENTS ==="
-            kubectl describe pod -n monitoring tempo-0 | tail -n 30 || true
-            kubectl logs -n monitoring tempo-0 --tail=30 || true
-            echo ""
-            echo "=== INGRESSES ==="
-            kubectl get ingress -A
-            echo ""
-            echo "=== ALB GRAFANA HEALTH ==="
-            curl -Iv --max-time 10 http://k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com/grafana/ || true
-          } > diag.txt
-          cat diag.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -B diag
-          git add diag.txt
-          git commit -m "chore: cluster diagnostics dump [skip ci]" || true
-          git push -f origin diag || true
+          echo "=== PODS ==="
+          kubectl get pods -A
+          echo ""
+          echo "=== PERSISTENT VOLUMES AND CLAIMS ==="
+          kubectl get pvc -A
+          echo ""
+          echo "=== ALB GRAFANA HEALTH ==="
+          curl -Iv --max-time 10 http://k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com/grafana/ || true
 
 
 

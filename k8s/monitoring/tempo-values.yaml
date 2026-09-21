@@ -1,0 +1,22 @@
+# ==============================================================================
+# Helm Values for Grafana Tempo Distributed / Standalone Tracing
+# ==============================================================================
+
+tempo:
+  repository: grafana/tempo
+  tag: 2.4.1
+  retention: 48h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+service:
+  type: ClusterIP
+
+persistence:
+  enabled: true
+  size: 10Gi

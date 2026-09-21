@@ -1,0 +1,120 @@
+# ==============================================================================
+# Helm Values for Hyperswitch Core Router
+# Configured to utilize AWS RDS PostgreSQL and Amazon ElastiCache Redis
+# ==============================================================================
+
+replicaCount: 2
+
+image:
+  repository: juspay/hyperswitch-router
+  pullPolicy: IfNotPresent
+  tag: "v1.115.0"
+
+# Disable sub-charts for PostgreSQL and Redis to use AWS Managed Services
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+kafka:
+  enabled: false
+
+clickhouse:
+  enabled: false
+
+mailhog:
+  enabled: false
+
+vector:
+  enabled: false
+
+superposition:
+  enabled: false
+
+hyperswitch-card-vault:
+  enabled: false
+
+hyperswitch-ucs:
+  enabled: false
+
+# External Secrets and Config Injection
+envFromSecrets:
+  - hyperswitch-secrets
+
+env:
+  - name: ROUTER__SERVER__HOST
+    value: "0.0.0.0"
+  - name: ROUTER__SERVER__PORT
+    value: "8080"
+  - name: ROUTER__DATABASE__HOST
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: DB_HOST
+  - name: ROUTER__DATABASE__PORT
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: DB_PORT
+  - name: ROUTER__DATABASE__USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: DB_USER
+  - name: ROUTER__DATABASE__PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: DB_PASSWORD
+  - name: ROUTER__DATABASE__DB_NAME
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: DB_NAME
+  - name: ROUTER__REDIS__HOST
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: REDIS_HOST
+  - name: ROUTER__REDIS__PORT
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: REDIS_PORT
+  - name: ROUTER__SECRETS__ADMIN_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: ADMIN_API_KEY
+  - name: ROUTER__SECRETS__JWT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: hyperswitch-secrets
+        key: JWT_SECRET
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 15
+  periodSeconds: 5

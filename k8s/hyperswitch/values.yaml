@@ -3,7 +3,7 @@
 # Configured to utilize AWS RDS PostgreSQL and Amazon ElastiCache Redis
 # ==============================================================================
 
-replicaCount: 2
+replicaCount: 1
 
 image:
   repository: juspay/hyperswitch-router

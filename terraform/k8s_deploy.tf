@@ -223,6 +223,14 @@ resource "null_resource" "k8s_workloads" {
     kube_prometheus_stack_id = helm_release.kube_prometheus_stack.id
     hyperswitch_id           = helm_release.hyperswitch.id
     lb_policy_hash           = sha256(file("${path.module}/aws_lb_controller_policy.json"))
+    services_hash            = sha256(join("", [
+      file("${path.module}/../k8s/services/auth-service/deployment.yaml"),
+      file("${path.module}/../k8s/services/cart-service/deployment.yaml"),
+      file("${path.module}/../k8s/services/inventory-service/deployment.yaml"),
+      file("${path.module}/../k8s/services/notification-service/deployment.yaml"),
+      file("${path.module}/../k8s/services/order-service/deployment.yaml"),
+      file("${path.module}/../k8s/services/product-service/deployment.yaml")
+    ]))
   }
 
   provisioner "local-exec" {

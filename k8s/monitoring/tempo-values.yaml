@@ -20,4 +20,4 @@ service:
 persistence:
   enabled: true
   size: 5Gi
-  storageClass: gp3
+  storageClassName: gp3

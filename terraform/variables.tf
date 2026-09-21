@@ -68,7 +68,7 @@ variable "eks_node_instance_types" {
 variable "eks_node_desired_size" {
   type        = number
   description = "Desired number of worker nodes in the node group"
-  default     = 2
+  default     = 3
 }
 
 variable "eks_node_min_size" {
@@ -80,7 +80,7 @@ variable "eks_node_min_size" {
 variable "eks_node_max_size" {
   type        = number
   description = "Maximum number of worker nodes in the node group"
-  default     = 3
+  default     = 4
 }
 
 # --- RDS PostgreSQL Database Variables ---

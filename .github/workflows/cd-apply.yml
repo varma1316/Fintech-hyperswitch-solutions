@@ -82,6 +82,12 @@ jobs:
             echo "=== AWS LOAD BALANCER CONTROLLER LOGS ==="
             kubectl logs -n kube-system deployment/aws-load-balancer-controller --tail=150 || true
             echo ""
+            echo "=== DESCRIBE TARGET HEALTH FOR GRAFANA ==="
+            TG_ARN=$(kubectl get targetgroupbinding -n monitoring -o jsonpath='{.items[0].spec.targetGroupARN}' || true)
+            if [ -n "$TG_ARN" ]; then
+              aws elbv2 describe-target-health --target-group-arn "$TG_ARN" || true
+            fi
+            echo ""
             echo "=== ALB HTTP RESPONSE TEST ==="
             curl -Iv --max-time 10 http://k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com/grafana/ || true
           } > diag.txt

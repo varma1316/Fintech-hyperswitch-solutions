@@ -1,239 +1,382 @@
-=== KUBERNETES NAMESPACES ===
-NAME                   STATUS   AGE
-auth-service           Active   162m
-cart-service           Active   162m
-default                Active   3h11m
-hyperswitch            Active   162m
-inventory-service      Active   162m
-kube-node-lease        Active   3h11m
-kube-public            Active   3h11m
-kube-system            Active   3h11m
-monitoring             Active   162m
-notification-service   Active   162m
-order-service          Active   162m
-product-service        Active   162m
+=== TERRAFORM OUTPUT (LAST 150 LINES) ===
+              [31m-[0m[0m notes          = <<-EOT
+                    ***********************************************************************
+                     Welcome to Grafana Loki
+                     Chart version: 5.47.2
+                     Loki version: 2.9.6
+                    ***********************************************************************
+                    
+                    Installed components:
+                    * grafana-agent-operator
+                    * loki
+                EOT
+              [31m-[0m[0m revision       = 3
+              [31m-[0m[0m values         = jsonencode(
+                    {
+                      [31m-[0m[0m backend        = {
+                          [31m-[0m[0m replicas = 0
+                        }
+                      [31m-[0m[0m deploymentMode = "SingleBinary"
+                      [31m-[0m[0m gateway        = {
+                          [31m-[0m[0m enabled = false
+                        }
+                      [31m-[0m[0m loki           = {
+                          [31m-[0m[0m auth_enabled  = false
+                          [31m-[0m[0m commonConfig  = {
+                              [31m-[0m[0m replication_factor = 1
+                            }
+                          [31m-[0m[0m compactor     = {
+                              [31m-[0m[0m delete_request_cancel_period = "0m"
+                              [31m-[0m[0m retention_enabled            = true
+                            }
+                          [31m-[0m[0m limits_config = {
+                              [31m-[0m[0m retention_period = "7h"
+                            }
+                          [31m-[0m[0m schemaConfig  = {
+                              [31m-[0m[0m configs = [
+                                  [31m-[0m[0m {
+                                      [31m-[0m[0m from         = "2024-01-01"
+                                      [31m-[0m[0m index        = {
+                                          [31m-[0m[0m period = "24h"
+                                          [31m-[0m[0m prefix = "index_"
+                                        }
+                                      [31m-[0m[0m object_store = "filesystem"
+                                      [31m-[0m[0m schema       = "v13"
+                                      [31m-[0m[0m store        = "tsdb"
+                                    },
+                                ]
+                            }
+                          [31m-[0m[0m storage       = {
+                              [31m-[0m[0m type = "filesystem"
+                            }
+                        }
+                      [31m-[0m[0m read           = {
+                          [31m-[0m[0m replicas = 0
+                        }
+                      [31m-[0m[0m singleBinary   = {
+                          [31m-[0m[0m persistence = {
+                              [31m-[0m[0m enabled      = true
+                              [31m-[0m[0m size         = "5Gi"
+                              [31m-[0m[0m storageClass = "gp3"
+                            }
+                          [31m-[0m[0m replicas    = 1
+                          [31m-[0m[0m resources   = {
+                              [31m-[0m[0m limits   = {
+                                  [31m-[0m[0m cpu    = "500m"
+                                  [31m-[0m[0m memory = "512Mi"
+                                }
+                              [31m-[0m[0m requests = {
+                                  [31m-[0m[0m cpu    = "100m"
+                                  [31m-[0m[0m memory = "256Mi"
+                                }
+                            }
+                        }
+                      [31m-[0m[0m test           = {
+                          [31m-[0m[0m enabled = false
+                        }
+                      [31m-[0m[0m write          = {
+                          [31m-[0m[0m replicas = 0
+                        }
+                    }
+                )
+              [31m-[0m[0m version        = "5.47.2"
+            },
+        ] -> (known after apply)
+        name                       = "loki"
+      [33m~[0m[0m values                     = [
+          [33m~[0m[0m <<-EOT
+                # ==============================================================================
+                # Helm Values for Grafana Loki (SingleBinary / Lightweight cluster mode)
+              [32m+[0m[0m # Retention: 7h | Volume: 5Gi gp3 EBS
+                # ==============================================================================
+                
+                deploymentMode: SingleBinary
+              [32m+[0m[0m revision: "v2"
+                
+                loki:
+                  auth_enabled: false
+                  commonConfig:
+                    replication_factor: 1
+                  storage:
+                    type: filesystem
+                  compactor:
+                    retention_enabled: true
+                    delete_request_cancel_period: 0m
+                  limits_config:
+                    retention_period: 7h
+                  schemaConfig:
+                    configs:
+                      - from: 2024-01-01
+                        store: tsdb
+                        object_store: filesystem
+                        schema: v13
+                        index:
+                          prefix: index_
+                          period: 24h
+                
+                singleBinary:
+                  replicas: 1
+                  resources:
+                    requests:
+                      cpu: 100m
+                      memory: 256Mi
+                    limits:
+                      cpu: 500m
+                      memory: 512Mi
+                  persistence:
+                    enabled: true
+                    size: 5Gi
+                    storageClass: gp3
+                
+                backend:
+                  replicas: 0
+                read:
+                  replicas: 0
+                write:
+                  replicas: 0
+                gateway:
+                  enabled: false
+                
+                test:
+                  enabled: false
+            EOT,
+        ]
+        [90m# (26 unchanged attributes hidden)[0m[0m
+    }
 
-=== ALL SERVICES ===
-NAMESPACE              NAME                                             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                                                                   AGE
-auth-service           auth-service                                     ClusterIP   172.20.31.242    <none>        4001/TCP                                                                                                  161m
-cart-service           cart-service                                     ClusterIP   172.20.37.65     <none>        4003/TCP                                                                                                  161m
-default                kubelet                                          ClusterIP   None             <none>        10250/TCP,10255/TCP,4194/TCP                                                                              161m
-default                kubernetes                                       ClusterIP   172.20.0.1       <none>        443/TCP                                                                                                   3h11m
-hyperswitch            hyperswitch-hyperswitch-server                   ClusterIP   172.20.63.138    <none>        80/TCP,443/TCP                                                                                            53m
-inventory-service      inventory-service                                ClusterIP   172.20.170.245   <none>        8001/TCP                                                                                                  161m
-kube-system            aws-load-balancer-webhook-service                ClusterIP   172.20.83.41     <none>        443/TCP                                                                                                   162m
-kube-system            eks-extension-metrics-api                        ClusterIP   172.20.215.125   <none>        443/TCP                                                                                                   3h11m
-kube-system            external-secrets-webhook                         ClusterIP   172.20.238.140   <none>        443/TCP                                                                                                   162m
-kube-system            kube-dns                                         ClusterIP   172.20.0.10      <none>        53/UDP,53/TCP,9153/TCP                                                                                    3h10m
-kube-system            kube-prometheus-stack-coredns                    ClusterIP   None             <none>        9153/TCP                                                                                                  53m
-kube-system            kube-prometheus-stack-kube-controller-manager    ClusterIP   None             <none>        10257/TCP                                                                                                 53m
-kube-system            kube-prometheus-stack-kube-etcd                  ClusterIP   None             <none>        2381/TCP                                                                                                  53m
-kube-system            kube-prometheus-stack-kube-proxy                 ClusterIP   None             <none>        10249/TCP                                                                                                 53m
-kube-system            kube-prometheus-stack-kube-scheduler             ClusterIP   None             <none>        10259/TCP                                                                                                 53m
-kube-system            kube-prometheus-stack-kubelet                    ClusterIP   None             <none>        10250/TCP,10255/TCP,4194/TCP                                                                              158m
-monitoring             alertmanager-operated                            ClusterIP   None             <none>        9093/TCP,9094/TCP,9094/UDP                                                                                52m
-monitoring             kube-prometheus-stack-alertmanager               ClusterIP   172.20.63.142    <none>        9093/TCP,8080/TCP                                                                                         53m
-monitoring             kube-prometheus-stack-grafana                    ClusterIP   172.20.105.208   <none>        80/TCP                                                                                                    53m
-monitoring             kube-prometheus-stack-kube-state-metrics         ClusterIP   172.20.45.27     <none>        8080/TCP                                                                                                  53m
-monitoring             kube-prometheus-stack-operator                   ClusterIP   172.20.248.65    <none>        443/TCP                                                                                                   53m
-monitoring             kube-prometheus-stack-prometheus                 ClusterIP   172.20.207.25    <none>        9090/TCP,8080/TCP                                                                                         53m
-monitoring             kube-prometheus-stack-prometheus-node-exporter   ClusterIP   172.20.23.75     <none>        9100/TCP                                                                                                  53m
-monitoring             loki                                             ClusterIP   172.20.110.40    <none>        3100/TCP,9095/TCP                                                                                         95m
-monitoring             loki-canary                                      ClusterIP   172.20.167.196   <none>        3500/TCP                                                                                                  95m
-monitoring             loki-headless                                    ClusterIP   None             <none>        3100/TCP                                                                                                  95m
-monitoring             loki-memberlist                                  ClusterIP   None             <none>        7946/TCP                                                                                                  95m
-monitoring             prometheus-operated                              ClusterIP   None             <none>        9090/TCP                                                                                                  52m
-monitoring             tempo                                            ClusterIP   172.20.164.241   <none>        6831/UDP,6832/UDP,3200/TCP,14268/TCP,14250/TCP,9411/TCP,55680/TCP,55681/TCP,4317/TCP,4318/TCP,55678/TCP   96m
-notification-service   notification-service                             ClusterIP   172.20.40.58     <none>        8002/TCP                                                                                                  161m
-order-service          order-service                                    ClusterIP   172.20.254.200   <none>        3000/TCP                                                                                                  161m
-product-service        product-service                                  ClusterIP   172.20.198.229   <none>        4002/TCP                                                                                                  161m
+[1mPlan:[0m [0m0 to add, 1 to change, 0 to destroy.
+[0m[1mhelm_release.loki: Modifying... [id=loki][0m[0m
+[0m[1mhelm_release.loki: Modifications complete after 6s [id=loki][0m
+[0m[1m[32m
+Apply complete! Resources: 0 added, 1 changed, 0 destroyed.[0m
 
-=== ALL PODS ===
-NAMESPACE              NAME                                                        READY   STATUS                       RESTARTS         AGE     IP            NODE                          NOMINATED NODE   READINESS GATES
-auth-service           auth-service-b85b9686-pxpm8                                 1/1     Running                      0                161m    10.0.12.123   ip-10-0-12-154.ec2.internal   <none>           <none>
-auth-service           auth-service-b85b9686-wqbwj                                 1/1     Running                      0                161m    10.0.11.162   ip-10-0-11-244.ec2.internal   <none>           <none>
-cart-service           cart-service-598fdb7946-9rl4x                               1/1     Running                      0                161m    10.0.11.249   ip-10-0-11-244.ec2.internal   <none>           <none>
-cart-service           cart-service-598fdb7946-pfsv9                               1/1     Running                      0                161m    10.0.12.55    ip-10-0-12-154.ec2.internal   <none>           <none>
-hyperswitch            hyperswitch-hyperswitch-consumer-676dc4688b-rhh6w           0/1     CreateContainerConfigError   0                53m     10.0.12.233   ip-10-0-12-154.ec2.internal   <none>           <none>
-hyperswitch            hyperswitch-hyperswitch-producer-db4f45f5d-wtdf4            0/1     CreateContainerConfigError   0                53m     10.0.11.216   ip-10-0-11-244.ec2.internal   <none>           <none>
-hyperswitch            hyperswitch-hyperswitch-server-58f6d86fc6-82zwm             0/1     Pending                      0                53m     <none>        <none>                        <none>           <none>
-hyperswitch            hyperswitch-hyperswitch-server-58f6d86fc6-8h78b             0/1     Pending                      0                53m     <none>        <none>                        <none>           <none>
-hyperswitch            hyperswitch-hyperswitch-server-58f6d86fc6-dvtxb             0/1     CreateContainerConfigError   0                53m     10.0.12.38    ip-10-0-12-154.ec2.internal   <none>           <none>
-inventory-service      inventory-service-6cbc5d4c98-ccczr                          1/1     Running                      0                161m    10.0.11.171   ip-10-0-11-244.ec2.internal   <none>           <none>
-inventory-service      inventory-service-6cbc5d4c98-hqslt                          1/1     Running                      0                161m    10.0.12.130   ip-10-0-12-154.ec2.internal   <none>           <none>
-kube-system            aws-load-balancer-controller-5ddbbc7f66-tsf5f               1/1     Running                      0                162m    10.0.12.17    ip-10-0-12-154.ec2.internal   <none>           <none>
-kube-system            aws-load-balancer-controller-5ddbbc7f66-wlv86               1/1     Running                      0                162m    10.0.11.140   ip-10-0-11-244.ec2.internal   <none>           <none>
-kube-system            aws-node-2822m                                              2/2     Running                      0                3h6m    10.0.11.244   ip-10-0-11-244.ec2.internal   <none>           <none>
-kube-system            aws-node-6zfch                                              2/2     Running                      0                3h6m    10.0.12.154   ip-10-0-12-154.ec2.internal   <none>           <none>
-kube-system            coredns-7754cc59f4-gc268                                    1/1     Running                      0                3h10m   10.0.11.71    ip-10-0-11-244.ec2.internal   <none>           <none>
-kube-system            coredns-7754cc59f4-j58rw                                    1/1     Running                      0                3h10m   10.0.11.16    ip-10-0-11-244.ec2.internal   <none>           <none>
-kube-system            external-secrets-664cf8c7dc-hgg56                           1/1     Running                      0                162m    10.0.12.37    ip-10-0-12-154.ec2.internal   <none>           <none>
-kube-system            external-secrets-cert-controller-c58c5bd6c-qsmrr            1/1     Running                      0                162m    10.0.11.194   ip-10-0-11-244.ec2.internal   <none>           <none>
-kube-system            external-secrets-webhook-7fdf468574-4rdlb                   1/1     Running                      0                162m    10.0.12.141   ip-10-0-12-154.ec2.internal   <none>           <none>
-kube-system            kube-proxy-9jx4z                                            1/1     Running                      0                3h6m    10.0.12.154   ip-10-0-12-154.ec2.internal   <none>           <none>
-kube-system            kube-proxy-xrctj                                            1/1     Running                      0                3h6m    10.0.11.244   ip-10-0-11-244.ec2.internal   <none>           <none>
-monitoring             alertmanager-kube-prometheus-stack-alertmanager-0           0/2     Pending                      0                52m     <none>        <none>                        <none>           <none>
-monitoring             kube-prometheus-stack-admission-create-qx9hp                0/1     Completed                    0                95m     10.0.12.253   ip-10-0-12-154.ec2.internal   <none>           <none>
-monitoring             kube-prometheus-stack-grafana-6f9b8698c9-r47sg              3/3     Running                      0                53m     10.0.11.240   ip-10-0-11-244.ec2.internal   <none>           <none>
-monitoring             kube-prometheus-stack-kube-state-metrics-85cc56db49-k9ktj   0/1     Pending                      0                53m     <none>        <none>                        <none>           <none>
-monitoring             kube-prometheus-stack-operator-64b57dc47c-gmsj6             1/1     Running                      0                53m     10.0.12.199   ip-10-0-12-154.ec2.internal   <none>           <none>
-monitoring             kube-prometheus-stack-prometheus-node-exporter-w46j2        0/1     Pending                      0                53m     <none>        <none>                        <none>           <none>
-monitoring             kube-prometheus-stack-prometheus-node-exporter-x4r7s        0/1     Pending                      0                53m     <none>        <none>                        <none>           <none>
-monitoring             loki-0                                                      0/1     CrashLoopBackOff             23 (2m38s ago)   96m     10.0.11.237   ip-10-0-11-244.ec2.internal   <none>           <none>
-monitoring             loki-canary-kj5sb                                           1/1     Running                      0                96m     10.0.12.65    ip-10-0-12-154.ec2.internal   <none>           <none>
-monitoring             loki-canary-t8zzp                                           1/1     Running                      0                96m     10.0.11.152   ip-10-0-11-244.ec2.internal   <none>           <none>
-monitoring             loki-grafana-agent-operator-b8f4865b9-7wvs7                 1/1     Running                      0                96m     10.0.11.178   ip-10-0-11-244.ec2.internal   <none>           <none>
-monitoring             loki-logs-ccvxx                                             0/2     Pending                      0                95m     <none>        <none>                        <none>           <none>
-monitoring             loki-logs-kms74                                             2/2     Running                      0                95m     10.0.12.253   ip-10-0-12-154.ec2.internal   <none>           <none>
-monitoring             prometheus-kube-prometheus-stack-prometheus-0               0/2     Pending                      0                52m     <none>        <none>                        <none>           <none>
-monitoring             tempo-0                                                     0/1     CrashLoopBackOff             23 (3m ago)      96m     10.0.12.212   ip-10-0-12-154.ec2.internal   <none>           <none>
-notification-service   notification-service-7ff69f6497-82qxh                       1/1     Running                      0                161m    10.0.12.98    ip-10-0-12-154.ec2.internal   <none>           <none>
-notification-service   notification-service-7ff69f6497-r6wwc                       1/1     Running                      0                161m    10.0.11.12    ip-10-0-11-244.ec2.internal   <none>           <none>
-order-service          order-service-697b87fc8-6xlc2                               1/1     Running                      0                161m    10.0.12.181   ip-10-0-12-154.ec2.internal   <none>           <none>
-order-service          order-service-697b87fc8-wj49n                               1/1     Running                      0                161m    10.0.11.101   ip-10-0-11-244.ec2.internal   <none>           <none>
-product-service        product-service-65c868d4b-r54hh                             1/1     Running                      0                161m    10.0.11.7     ip-10-0-11-244.ec2.internal   <none>           <none>
-product-service        product-service-65c868d4b-xj25m                             1/1     Running                      0                161m    10.0.12.85    ip-10-0-12-154.ec2.internal   <none>           <none>
+=== NODES ===
+NAME                          STATUS   ROLES    AGE     VERSION                INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                        KERNEL-VERSION                    CONTAINER-RUNTIME
+ip-10-0-11-244.ec2.internal   Ready    <none>   4h54m   v1.30.14-eks-8f14419   10.0.11.244   <none>        Amazon Linux 2023.12.20260710   6.1.176-221.360.amzn2023.x86_64   containerd://2.2.4+unknown
+ip-10-0-12-154.ec2.internal   Ready    <none>   4h54m   v1.30.14-eks-8f14419   10.0.12.154   <none>        Amazon Linux 2023.12.20260710   6.1.176-221.360.amzn2023.x86_64   containerd://2.2.4+unknown
+ip-10-0-12-57.ec2.internal    Ready    <none>   11m     v1.30.14-eks-8f14419   10.0.12.57    <none>        Amazon Linux 2023.12.20260710   6.1.176-221.360.amzn2023.x86_64   containerd://2.2.4+unknown
 
-=== ALL INGRESSES ===
+=== HELM RELEASES ===
+NAME                        	NAMESPACE  	REVISION	UPDATED                                	STATUS  	CHART                             	APP VERSION
+aws-load-balancer-controller	kube-system	1       	2026-09-21 09:19:39.487924629 +0000 UTC	deployed	aws-load-balancer-controller-1.8.1	v2.8.1     
+external-secrets            	kube-system	1       	2026-09-21 09:19:38.393688803 +0000 UTC	deployed	external-secrets-0.9.19           	v0.9.19    
+hyperswitch                 	hyperswitch	3       	2026-09-21 13:22:19.723429232 +0000 UTC	deployed	hyperswitch-app-1.3.1             	v1.126.0   
+kube-prometheus-stack       	monitoring 	3       	2026-09-21 13:22:23.833475716 +0000 UTC	deployed	kube-prometheus-stack-58.2.2      	v0.73.2    
+loki                        	monitoring 	4       	2026-09-21 13:49:19.628314857 +0000 UTC	deployed	loki-5.47.2                       	2.9.6      
+tempo                       	monitoring 	4       	2026-09-21 13:36:53.535470791 +0000 UTC	deployed	tempo-1.24.4                      	2.9.0      
+
+=== EKS ADDONS ===
+{
+    "addons": [
+        "aws-ebs-csi-driver"
+    ]
+}
+{
+    "addon": {
+        "addonName": "aws-ebs-csi-driver",
+        "clusterName": "hyperswitch-cluster",
+        "status": "DEGRADED",
+        "addonVersion": "v1.66.0-eksbuild.1",
+        "health": {
+            "issues": [
+                {
+                    "code": "InsufficientNumberOfReplicas",
+                    "message": "The add-on is unhealthy because one or more pods have waiting containers: 2/3 pods available. Pods are waiting because: ContainerCreating: "
+                }
+            ]
+        },
+        "addonArn": "arn:aws:eks:us-east-1:690998797903:addon/hyperswitch-cluster/aws-ebs-csi-driver/b0d06206-4dd4-4fba-f7ac-f249eb3dcb5e",
+        "createdAt": "2026-09-21T12:59:15.962000+00:00",
+        "modifiedAt": "2026-09-21T13:49:02.236000+00:00",
+        "serviceAccountRoleArn": "arn:aws:iam::690998797903:role/hyperswitch-ebs-csi-role",
+        "tags": {
+            "Project": "hyperswitch",
+            "ManagedBy": "Terraform"
+        },
+        "namespaceConfig": {
+            "namespace": "kube-system"
+        }
+    }
+}
+
+=== PODS ===
+NAMESPACE              NAME                                                        READY   STATUS                       RESTARTS   AGE
+auth-service           auth-service-b85b9686-pxpm8                                 1/1     Running                      0          4h29m
+cart-service           cart-service-598fdb7946-9rl4x                               1/1     Running                      0          4h29m
+hyperswitch            hyperswitch-hyperswitch-consumer-676dc4688b-rhh6w           0/1     CreateContainerConfigError   0          161m
+hyperswitch            hyperswitch-hyperswitch-producer-db4f45f5d-wtdf4            0/1     CreateContainerConfigError   0          161m
+hyperswitch            hyperswitch-hyperswitch-server-58f6d86fc6-5c55k             0/1     CreateContainerConfigError   0          50m
+hyperswitch            hyperswitch-hyperswitch-server-58f6d86fc6-dvtxb             0/1     CreateContainerConfigError   0          161m
+hyperswitch            hyperswitch-hyperswitch-server-58f6d86fc6-svm22             0/1     CreateContainerConfigError   0          60m
+inventory-service      inventory-service-6cbc5d4c98-hqslt                          1/1     Running                      0          4h29m
+kube-system            aws-load-balancer-controller-7778484766-dszcg               1/1     Running                      0          76m
+kube-system            aws-load-balancer-controller-7778484766-zwnt2               1/1     Running                      0          76m
+kube-system            aws-node-c8wb9                                              2/2     Running                      0          13m
+kube-system            aws-node-pz6pd                                              2/2     Running                      0          13m
+kube-system            aws-node-zt49j                                              2/2     Running                      0          11m
+kube-system            coredns-7754cc59f4-gc268                                    1/1     Running                      0          4h58m
+kube-system            coredns-7754cc59f4-j58rw                                    1/1     Running                      0          4h58m
+kube-system            ebs-csi-controller-6f7d4f5dd4-z5j9j                         6/6     Running                      0          50m
+kube-system            ebs-csi-controller-6f7d4f5dd4-zqt4m                         6/6     Running                      0          50m
+kube-system            ebs-csi-node-7vs98                                          3/3     Running                      0          50m
+kube-system            ebs-csi-node-rr7dn                                          3/3     Running                      0          50m
+kube-system            ebs-csi-node-xz2dj                                          0/3     ContainerCreating            0          11m
+kube-system            external-secrets-664cf8c7dc-hgg56                           1/1     Running                      0          4h30m
+kube-system            external-secrets-cert-controller-c58c5bd6c-qsmrr            1/1     Running                      0          4h30m
+kube-system            external-secrets-webhook-7fdf468574-4rdlb                   1/1     Running                      0          4h30m
+kube-system            kube-proxy-9jx4z                                            1/1     Running                      0          4h54m
+kube-system            kube-proxy-nqbvz                                            1/1     Running                      0          11m
+kube-system            kube-proxy-xrctj                                            1/1     Running                      0          4h54m
+monitoring             alertmanager-kube-prometheus-stack-alertmanager-0           0/2     Init:0/1                     0          160m
+monitoring             kube-prometheus-stack-admission-create-qx9hp                0/1     Completed                    0          3h24m
+monitoring             kube-prometheus-stack-grafana-6f9b8698c9-w6mp4              3/3     Running                      0          95m
+monitoring             kube-prometheus-stack-kube-state-metrics-85cc56db49-5s2n7   1/1     Running                      0          50m
+monitoring             kube-prometheus-stack-operator-64b57dc47c-bjmkv             1/1     Running                      0          76m
+monitoring             kube-prometheus-stack-prometheus-node-exporter-kmgt9        1/1     Running                      0          11m
+monitoring             kube-prometheus-stack-prometheus-node-exporter-krrwd        1/1     Running                      0          13m
+monitoring             kube-prometheus-stack-prometheus-node-exporter-x4r7s        0/1     Pending                      0          161m
+monitoring             loki-0                                                      0/1     Pending                      0          53s
+monitoring             loki-canary-kj5sb                                           1/1     Running                      0          3h24m
+monitoring             loki-canary-pvrcg                                           0/1     ContainerCreating            0          11m
+monitoring             loki-canary-t8zzp                                           1/1     Running                      0          3h24m
+monitoring             loki-grafana-agent-operator-b8f4865b9-7wvs7                 1/1     Running                      0          3h24m
+monitoring             loki-logs-jvxpk                                             0/2     Pending                      0          39m
+monitoring             loki-logs-kms74                                             2/2     Running                      0          3h23m
+monitoring             loki-logs-pxlts                                             0/2     ContainerCreating            0          11m
+monitoring             prometheus-kube-prometheus-stack-prometheus-0               0/2     Init:0/1                     0          13m
+monitoring             tempo-0                                                     0/1     Pending                      0          13m
+notification-service   notification-service-7ff69f6497-82qxh                       1/1     Running                      0          4h29m
+order-service          order-service-697b87fc8-6xlc2                               1/1     Running                      0          4h29m
+product-service        product-service-65c868d4b-r54hh                             1/1     Running                      0          4h29m
+
+=== PERSISTENT VOLUMES AND CLAIMS ===
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                                                                                                     STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+pvc-0462dce9-8369-447e-b2a8-df3cdda6c12f   5Gi        RWO            Delete           Bound    monitoring/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0   gp3            <unset>                          20m
+NAMESPACE    NAME                                                                                           STATUS    VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+monitoring   prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0   Bound     pvc-0462dce9-8369-447e-b2a8-df3cdda6c12f   5Gi        RWO            gp3            <unset>                 34m
+monitoring   storage-loki-0                                                                                 Pending                                                                        gp3            <unset>                 34m
+monitoring   storage-tempo-0                                                                                Pending                                                                        gp3            <unset>                 13m
+
+=== STORAGE CLASSES ===
+NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2             kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  5h
+gp3 (default)   ebs.csi.aws.com         Delete          WaitForFirstConsumer   true                   23m
+
+=== PROMETHEUS POD EVENTS ===
+    Optional:    false
+  config-out:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     Memory
+    SizeLimit:  <unset>
+  prometheus-kube-prometheus-stack-prometheus-rulefiles-0:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      prometheus-kube-prometheus-stack-prometheus-rulefiles-0
+    Optional:  false
+  web-config:
+    Type:        Secret (a volume populated by a Secret)
+    SecretName:  prometheus-kube-prometheus-stack-prometheus-web-config
+    Optional:    false
+  kube-api-access-j7zc9:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason              Age                 From                     Message
+  ----     ------              ----                ----                     -------
+  Warning  FailedScheduling    13m                 default-scheduler        0/2 nodes are available: 1 Too many pods, 1 node(s) had volume node affinity conflict. preemption: 0/2 nodes are available: 1 No preemption victims found for incoming pod, 1 Preemption is not helpful for scheduling.
+  Warning  FailedScheduling    13m (x3 over 13m)   default-scheduler        0/2 nodes are available: 2 Too many pods. preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod.
+  Normal   Scheduled           11m                 default-scheduler        Successfully assigned monitoring/prometheus-kube-prometheus-stack-prometheus-0 to ip-10-0-12-57.ec2.internal
+  Warning  FailedAttachVolume  77s (x13 over 11m)  attachdetach-controller  AttachVolume.Attach failed for volume "pvc-0462dce9-8369-447e-b2a8-df3cdda6c12f" : CSINode ip-10-0-12-57.ec2.internal does not contain driver ebs.csi.aws.com
+
+=== LOKI POD LOGS / EVENTS ===
+      /var/loki from storage (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-hgrgt (ro)
+Volumes:
+  storage:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  storage-loki-0
+    ReadOnly:   false
+  tmp:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     
+    SizeLimit:  <unset>
+  config:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      loki
+    Optional:  false
+  runtime-config:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      loki-runtime
+    Optional:  false
+  kube-api-access-hgrgt:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:                      <none>
+
+=== TEMPO POD LOGS / EVENTS ===
+      /conf from tempo-conf (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-7qh8l (ro)
+      /var/tempo from storage (rw)
+Conditions:
+  Type           Status
+  PodScheduled   False 
+Volumes:
+  storage:
+    Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:  storage-tempo-0
+    ReadOnly:   false
+  tempo-conf:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      tempo
+    Optional:  false
+  kube-api-access-7qh8l:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason            Age   From               Message
+  ----     ------            ----  ----               -------
+  Warning  FailedScheduling  13m   default-scheduler  0/2 nodes are available: 2 Too many pods. preemption: 0/2 nodes are available: 2 No preemption victims found for incoming pod.
+  Warning  FailedScheduling  103s  default-scheduler  running PreBind plugin "VolumeBinding": binding volumes: context deadline exceeded
+
+=== INGRESSES ===
 NAMESPACE           NAME                        CLASS    HOSTS   ADDRESS                                                                   PORTS   AGE
-auth-service        auth-service-ingress        <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      161m
-cart-service        cart-service-ingress        <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      161m
-hyperswitch         hyperswitch-ingress         <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      161m
-inventory-service   inventory-service-ingress   <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      161m
-monitoring          grafana-ingress             <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      161m
-order-service       order-service-ingress       <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      161m
-product-service     product-service-ingress     <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      161m
+auth-service        auth-service-ingress        <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      4h29m
+cart-service        cart-service-ingress        <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      4h29m
+hyperswitch         hyperswitch-ingress         <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      4h29m
+inventory-service   inventory-service-ingress   <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      4h29m
+monitoring          grafana-ingress             <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      4h29m
+order-service       order-service-ingress       <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      4h29m
+product-service     product-service-ingress     <none>   *       k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com   80      4h29m
 
-=== TARGET GROUP BINDINGS ===
-NAMESPACE           NAME                               SERVICE-NAME        SERVICE-PORT   TARGET-TYPE   AGE
-auth-service        k8s-authserv-authserv-cc1b01f1cc   auth-service        4001           ip            161m
-cart-service        k8s-cartserv-cartserv-21bff3e3de   cart-service        4003           ip            161m
-inventory-service   k8s-inventor-inventor-0151abe16f   inventory-service   8001           ip            161m
-order-service       k8s-orderser-orderser-105ec4c683   order-service       3000           ip            161m
-product-service     k8s-products-products-80a0c7cefb   product-service     4002           ip            161m
+=== ALB GRAFANA HEALTH ===
+HTTP/1.1 302 Found
+Date: Mon, 21 Sep 2026 13:50:23 GMT
+Content-Type: text/html; charset=utf-8
+Connection: keep-alive
+Cache-Control: no-store
+Location: /grafana/login
+Set-Cookie: redirect_to=%2Fgrafana%2F; Path=/grafana; HttpOnly; SameSite=Lax
+X-Content-Type-Options: nosniff
+X-Frame-Options: deny
+X-Xss-Protection: 1; mode=block
 
-=== DESCRIBE GRAFANA INGRESS ===
-Name:             grafana-ingress
-Labels:           app.kubernetes.io/part-of=hyperswitch-platform
-Namespace:        monitoring
-Address:          k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com
-Ingress Class:    <none>
-Default backend:  <default>
-Rules:
-  Host        Path  Backends
-  ----        ----  --------
-  *           
-              /grafana   kube-prometheus-stack-grafana:80 (10.0.11.240:3000)
-Annotations:  alb.ingress.kubernetes.io/group.name: hyperswitch-platform
-              alb.ingress.kubernetes.io/group.order: 10
-              alb.ingress.kubernetes.io/healthcheck-path: /api/health
-              alb.ingress.kubernetes.io/listen-ports: [{"HTTP": 80}]
-              alb.ingress.kubernetes.io/scheme: internet-facing
-              alb.ingress.kubernetes.io/success-codes: 200-399
-              alb.ingress.kubernetes.io/target-type: ip
-              kubernetes.io/ingress.class: alb
-Events:
-  Type     Reason             Age   From     Message
-  ----     ------             ----  ----     -------
-  Warning  FailedDeployModel  53m   ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 2164a636-5ca9-40af-9a17-a9a3a15c03cd
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: ff868bc3-9ee4-43a8-b463-fc7e2369312c
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: ee298708-729f-4bc0-9c7b-cd8019c96d16
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 16a920d7-f0db-4ee3-a50d-62eaae152566
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: e29d267b-a20f-4b6b-95b3-07bf295d66fa
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: c4c35827-4e86-4511-b99f-530a235fe966
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 0f023144-e233-4913-93b0-a86d61dae68a
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 79acc4ea-bf1d-4ce2-b701-9c7725ac3f71
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 32fc926f-2f74-4e80-90c7-a794493f52b8
-  Warning  FailedDeployModel  42m (x18 over 153m)  ingress  (combined from similar events): Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 893e2098-3d5a-4285-94a2-ee53eee97f60
-  Warning  FailedDeployModel  31m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: f4527af5-f762-4c9f-988f-434776010013
-  Warning  FailedDeployModel  14m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: d72658e1-7224-47a6-8c8d-c6082253a3d8
-  Warning  FailedDeployModel  5m14s  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: d189d4c3-363e-46ae-93c4-86847e048472
-  Warning  FailedDeployModel  5m14s  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 2cbfba28-aca5-48ed-b4bd-a238131e9ce6
-
-=== DESCRIBE HYPERSWITCH INGRESS ===
-Name:             hyperswitch-ingress
-Labels:           app.kubernetes.io/part-of=hyperswitch-platform
-Namespace:        hyperswitch
-Address:          k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com
-Ingress Class:    <none>
-Default backend:  <default>
-Rules:
-  Host        Path  Backends
-  ----        ----  --------
-  *           
-              /hyperswitch   hyperswitch-hyperswitch-server:80 ()
-              /payments      hyperswitch-hyperswitch-server:80 ()
-              /refunds       hyperswitch-hyperswitch-server:80 ()
-              /mandates      hyperswitch-hyperswitch-server:80 ()
-Annotations:  alb.ingress.kubernetes.io/group.name: hyperswitch-platform
-              alb.ingress.kubernetes.io/group.order: 70
-              alb.ingress.kubernetes.io/healthcheck-path: /health
-              alb.ingress.kubernetes.io/scheme: internet-facing
-              alb.ingress.kubernetes.io/success-codes: 200-399
-              alb.ingress.kubernetes.io/target-type: ip
-              kubernetes.io/ingress.class: alb
-Events:
-  Type     Reason             Age   From     Message
-  ----     ------             ----  ----     -------
-  Warning  FailedDeployModel  53m   ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 2164a636-5ca9-40af-9a17-a9a3a15c03cd
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: ff868bc3-9ee4-43a8-b463-fc7e2369312c
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: ee298708-729f-4bc0-9c7b-cd8019c96d16
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 16a920d7-f0db-4ee3-a50d-62eaae152566
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: e29d267b-a20f-4b6b-95b3-07bf295d66fa
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: c4c35827-4e86-4511-b99f-530a235fe966
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 0f023144-e233-4913-93b0-a86d61dae68a
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 79acc4ea-bf1d-4ce2-b701-9c7725ac3f71
-  Warning  FailedDeployModel  53m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 32fc926f-2f74-4e80-90c7-a794493f52b8
-  Warning  FailedDeployModel  42m (x18 over 153m)  ingress  (combined from similar events): Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789986215252071498 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 893e2098-3d5a-4285-94a2-ee53eee97f60
-  Warning  FailedDeployModel  31m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: f4527af5-f762-4c9f-988f-434776010013
-  Warning  FailedDeployModel  14m  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: d72658e1-7224-47a6-8c8d-c6082253a3d8
-  Warning  FailedDeployModel  5m15s  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: d189d4c3-363e-46ae-93c4-86847e048472
-  Warning  FailedDeployModel  5m15s  ingress  Failed deploy model due to AccessDenied: User: arn:aws:sts::690998797903:assumed-role/hyperswitch-aws-lb-controller-role/1789990250843153512 is not authorized to perform: elasticloadbalancing:ModifyRule on resource: arn:aws:elasticloadbalancing:us-east-1:690998797903:listener-rule/app/k8s-hyperswitchplatfo-e76b9467f2/fa653561ef633181/745314bf1598d048/31c8d71690f20d13 because no identity-based policy allows the elasticloadbalancing:ModifyRule action
-           status code: 403, request id: 2cbfba28-aca5-48ed-b4bd-a238131e9ce6
-
-=== AWS LOAD BALANCER CONTROLLER LOGS ===
-{"level":"info","ts":"2026-09-21T09:19:50Z","msg":"version","GitVersion":"v2.8.1","GitCommit":"e6ce604adc0746511d58c3c81ac7eae7cdaf7bbe","BuildDate":"2024-05-31T21:34:51+0000"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"setup","msg":"adding health check for controller"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"setup","msg":"adding readiness check for webhook"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"controller-runtime.webhook","msg":"Registering webhook","path":"/mutate-v1-pod"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"controller-runtime.webhook","msg":"Registering webhook","path":"/mutate-v1-service"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"controller-runtime.webhook","msg":"Registering webhook","path":"/validate-elbv2-k8s-aws-v1beta1-ingressclassparams"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"controller-runtime.webhook","msg":"Registering webhook","path":"/mutate-elbv2-k8s-aws-v1beta1-targetgroupbinding"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"controller-runtime.webhook","msg":"Registering webhook","path":"/validate-elbv2-k8s-aws-v1beta1-targetgroupbinding"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"controller-runtime.webhook","msg":"Registering webhook","path":"/validate-networking-v1-ingress"}
-{"level":"info","ts":"2026-09-21T09:19:50Z","logger":"setup","msg":"starting podInfo repo"}
-{"level":"info","ts":"2026-09-21T09:19:52Z","logger":"controller-runtime.metrics","msg":"Starting metrics server"}
-{"level":"info","ts":"2026-09-21T09:19:52Z","msg":"starting server","name":"health probe","addr":"[::]:61779"}
-{"level":"info","ts":"2026-09-21T09:19:52Z","logger":"controller-runtime.webhook","msg":"Starting webhook server"}
-{"level":"info","ts":"2026-09-21T09:19:52Z","logger":"controller-runtime.metrics","msg":"Serving metrics server","bindAddress":":8080","secure":false}
-{"level":"info","ts":"2026-09-21T09:19:52Z","logger":"controller-runtime.certwatcher","msg":"Updated current TLS certificate"}
-{"level":"info","ts":"2026-09-21T09:19:52Z","logger":"controller-runtime.webhook","msg":"Serving webhook server","host":"","port":9443}
-{"level":"info","ts":"2026-09-21T09:19:52Z","logger":"controller-runtime.certwatcher","msg":"Starting certificate watcher"}
-I0921 09:19:52.996300       1 leaderelection.go:250] attempting to acquire leader lease kube-system/aws-load-balancer-controller-leader...

@@ -48,6 +48,7 @@ jobs:
         run: |
           aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
           kubectl apply -f ../k8s/monitoring/storageclass.yaml || true
+          kubectl delete pod -n monitoring loki-0 tempo-0 prometheus-kube-prometheus-stack-prometheus-0 --force --grace-period=0 || true
           kubectl delete statefulset -n monitoring prometheus-kube-prometheus-stack-prometheus loki tempo --cascade=orphan || true
 
       - name: Terraform Apply
@@ -75,6 +76,17 @@ jobs:
             echo ""
             echo "=== STORAGE CLASSES ==="
             kubectl get sc
+            echo ""
+            echo "=== PROMETHEUS POD EVENTS ==="
+            kubectl describe pod -n monitoring prometheus-kube-prometheus-stack-prometheus-0 | tail -n 30 || true
+            echo ""
+            echo "=== LOKI POD LOGS / EVENTS ==="
+            kubectl describe pod -n monitoring loki-0 | tail -n 30 || true
+            kubectl logs -n monitoring loki-0 --tail=30 || true
+            echo ""
+            echo "=== TEMPO POD LOGS / EVENTS ==="
+            kubectl describe pod -n monitoring tempo-0 | tail -n 30 || true
+            kubectl logs -n monitoring tempo-0 --tail=30 || true
             echo ""
             echo "=== INGRESSES ==="
             kubectl get ingress -A

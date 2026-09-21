@@ -9,6 +9,16 @@ resource "random_password" "jwt_secret" {
   special = false
 }
 
+resource "random_password" "hyperswitch_api_key" {
+  length  = 32
+  special = false
+}
+
+resource "random_password" "hyperswitch_admin_key" {
+  length  = 32
+  special = false
+}
+
 resource "aws_secretsmanager_secret" "infra" {
   name                    = "${var.project_name}/infra"
   description             = "Consolidated infrastructure endpoints, credentials, and parameters for Hyperswitch frontend and backend services"
@@ -65,8 +75,16 @@ resource "aws_secretsmanager_secret_version" "infra" {
     DATABASE_URL = "postgresql://${aws_db_instance.postgres.username}:${random_password.db_password.result}@${aws_db_instance.postgres.endpoint}/${aws_db_instance.postgres.db_name}"
     ORDER_DB_URL = "postgresql://${aws_db_instance.postgres.username}:${random_password.db_password.result}@${aws_db_instance.postgres.endpoint}/${aws_db_instance.postgres.db_name}"
 
-    # Application Authentication Tokens
-    JWT_SECRET = random_password.jwt_secret.result
+    # ElastiCache Redis Cluster Configuration
+    REDIS_HOST = aws_elasticache_cluster.redis.cache_nodes[0].address
+    REDIS_PORT = "6379"
+    REDIS_URL  = "redis://${aws_elasticache_cluster.redis.cache_nodes[0].address}:6379"
+
+    # Application Authentication Tokens & Hyperswitch API Keys
+    JWT_SECRET                 = random_password.jwt_secret.result
+    HYPERSWITCH_SERVER_URL     = "http://hyperswitch.hyperswitch.svc.cluster.local:8080"
+    HYPERSWITCH_API_KEY        = random_password.hyperswitch_api_key.result
+    HYPERSWITCH_ADMIN_API_KEY  = random_password.hyperswitch_admin_key.result
 
     # Amazon ECR Registry & Repository URLs
     ECR_REGISTRY             = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"

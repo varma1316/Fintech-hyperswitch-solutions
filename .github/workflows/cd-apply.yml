@@ -40,7 +40,8 @@ jobs:
 
       - name: Terraform Init
         run: |
-          terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+          TF_BUCKET=$(echo -n "${{ secrets.TF_STATE_BUCKET }}" | tr -d '[:space:]')
+          terraform init -backend-config="bucket=${TF_BUCKET}"
 
       - name: Terraform Apply
         run: |

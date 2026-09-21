@@ -1,0 +1,258 @@
+# ==============================================================================
+# AWS Application Load Balancer Ingress Group for Hyperswitch Platform
+# Leverages AWS Load Balancer Controller IngressGroup feature to merge
+# all microservices, Hyperswitch Core, and Grafana onto a single ALB.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Monitoring / Grafana Ingress
+# ------------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: hyperswitch-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: hyperswitch-platform
+    alb.ingress.kubernetes.io/group.order: "10"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /grafana/api/health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
+---
+# ------------------------------------------------------------------------------
+# 2. Auth Service Ingress
+# ------------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: auth-service-ingress
+  namespace: auth-service
+  labels:
+    app.kubernetes.io/part-of: hyperswitch-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: hyperswitch-platform
+    alb.ingress.kubernetes.io/group.order: "20"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /login
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 4001
+          - path: /register
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 4001
+          - path: /me
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 4001
+---
+# ------------------------------------------------------------------------------
+# 3. Cart Service Ingress
+# ------------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cart-service-ingress
+  namespace: cart-service
+  labels:
+    app.kubernetes.io/part-of: hyperswitch-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: hyperswitch-platform
+    alb.ingress.kubernetes.io/group.order: "30"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /cart
+            pathType: Prefix
+            backend:
+              service:
+                name: cart-service
+                port:
+                  number: 4003
+---
+# ------------------------------------------------------------------------------
+# 4. Product Service Ingress
+# ------------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: product-service-ingress
+  namespace: product-service
+  labels:
+    app.kubernetes.io/part-of: hyperswitch-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: hyperswitch-platform
+    alb.ingress.kubernetes.io/group.order: "40"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /products
+            pathType: Prefix
+            backend:
+              service:
+                name: product-service
+                port:
+                  number: 4002
+          - path: /categories
+            pathType: Prefix
+            backend:
+              service:
+                name: product-service
+                port:
+                  number: 4002
+---
+# ------------------------------------------------------------------------------
+# 5. Order Service Ingress
+# ------------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: order-service-ingress
+  namespace: order-service
+  labels:
+    app.kubernetes.io/part-of: hyperswitch-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: hyperswitch-platform
+    alb.ingress.kubernetes.io/group.order: "50"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /create-checkout
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 3000
+          - path: /orders
+            pathType: Prefix
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 3000
+---
+# ------------------------------------------------------------------------------
+# 6. Inventory Service Ingress
+# ------------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: inventory-service-ingress
+  namespace: inventory-service
+  labels:
+    app.kubernetes.io/part-of: hyperswitch-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: hyperswitch-platform
+    alb.ingress.kubernetes.io/group.order: "60"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /inventory
+            pathType: Prefix
+            backend:
+              service:
+                name: inventory-service
+                port:
+                  number: 8001
+---
+# ------------------------------------------------------------------------------
+# 7. Hyperswitch Core Ingress
+# ------------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hyperswitch-ingress
+  namespace: hyperswitch
+  labels:
+    app.kubernetes.io/part-of: hyperswitch-platform
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/group.name: hyperswitch-platform
+    alb.ingress.kubernetes.io/group.order: "70"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /hyperswitch
+            pathType: Prefix
+            backend:
+              service:
+                name: hyperswitch
+                port:
+                  number: 8080
+          - path: /payments
+            pathType: Prefix
+            backend:
+              service:
+                name: hyperswitch
+                port:
+                  number: 8080
+          - path: /refunds
+            pathType: Prefix
+            backend:
+              service:
+                name: hyperswitch
+                port:
+                  number: 8080
+          - path: /mandates
+            pathType: Prefix
+            backend:
+              service:
+                name: hyperswitch
+                port:
+                  number: 8080

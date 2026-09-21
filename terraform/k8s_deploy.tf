@@ -220,6 +220,8 @@ resource "null_resource" "k8s_workloads" {
       file("${path.module}/../k8s/external-secrets/cluster-secret-store.yaml"),
       file("${path.module}/../k8s/ingress/alb-ingress.yaml")
     ]))
+    kube_prometheus_stack_id = helm_release.kube_prometheus_stack.id
+    hyperswitch_id           = helm_release.hyperswitch.id
   }
 
   provisioner "local-exec" {
@@ -242,6 +244,8 @@ resource "null_resource" "k8s_workloads" {
     aws_eks_node_group.main,
     helm_release.external_secrets,
     helm_release.aws_load_balancer_controller,
+    helm_release.kube_prometheus_stack,
+    helm_release.hyperswitch,
     kubernetes_namespace.namespaces
   ]
 }

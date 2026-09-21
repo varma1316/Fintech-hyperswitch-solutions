@@ -21,7 +21,8 @@ metadata:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-    alb.ingress.kubernetes.io/healthcheck-path: /grafana/api/health
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    alb.ingress.kubernetes.io/success-codes: "200-399"
 spec:
   rules:
     - http:
@@ -224,6 +225,7 @@ metadata:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/success-codes: "200-399"
 spec:
   rules:
     - http:
@@ -232,27 +234,27 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: hyperswitch
+                name: hyperswitch-hyperswitch-server
                 port:
-                  number: 8080
+                  number: 80
           - path: /payments
             pathType: Prefix
             backend:
               service:
-                name: hyperswitch
+                name: hyperswitch-hyperswitch-server
                 port:
-                  number: 8080
+                  number: 80
           - path: /refunds
             pathType: Prefix
             backend:
               service:
-                name: hyperswitch
+                name: hyperswitch-hyperswitch-server
                 port:
-                  number: 8080
+                  number: 80
           - path: /mandates
             pathType: Prefix
             backend:
               service:
-                name: hyperswitch
+                name: hyperswitch-hyperswitch-server
                 port:
-                  number: 8080
+                  number: 80

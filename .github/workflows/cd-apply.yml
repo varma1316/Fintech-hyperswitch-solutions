@@ -48,7 +48,7 @@ jobs:
         run: |
           aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
           kubectl apply -f ../k8s/monitoring/storageclass.yaml || true
-          kubectl delete statefulset -n monitoring prometheus-kube-prometheus-stack-prometheus loki --cascade=orphan || true
+          kubectl delete statefulset -n monitoring prometheus-kube-prometheus-stack-prometheus loki tempo --cascade=orphan || true
 
       - name: Terraform Apply
         run: |

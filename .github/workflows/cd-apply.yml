@@ -47,57 +47,17 @@ jobs:
       - name: Terraform Apply
         run: |
           terraform apply -auto-approve
-          aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
-          kubectl rollout restart deployment/aws-load-balancer-controller -n kube-system
-          kubectl rollout status deployment/aws-load-balancer-controller -n kube-system --timeout=90s || true
-          sleep 20
 
-      - name: Diagnostic Dump to diag branch
+      - name: Cluster Status Verification
         if: always()
         run: |
           aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
-          cd ..
-          {
-            echo "=== KUBERNETES NAMESPACES ==="
-            kubectl get ns
-            echo ""
-            echo "=== ALL SERVICES ==="
-            kubectl get svc -A
-            echo ""
-            echo "=== ALL PODS ==="
-            kubectl get pods -A -o wide
-            echo ""
-            echo "=== ALL INGRESSES ==="
-            kubectl get ingress -A
-            echo ""
-            echo "=== TARGET GROUP BINDINGS ==="
-            kubectl get targetgroupbindings -A || true
-            echo ""
-            echo "=== DESCRIBE GRAFANA INGRESS ==="
-            kubectl describe ingress -n monitoring grafana-ingress || true
-            echo ""
-            echo "=== DESCRIBE HYPERSWITCH INGRESS ==="
-            kubectl describe ingress -n hyperswitch hyperswitch-ingress || true
-            echo ""
-            echo "=== AWS LOAD BALANCER CONTROLLER LOGS ==="
-            kubectl logs -n kube-system deployment/aws-load-balancer-controller --tail=150 || true
-            echo ""
-            echo "=== DESCRIBE TARGET HEALTH FOR GRAFANA ==="
-            TG_ARN=$(kubectl get targetgroupbinding -n monitoring -o jsonpath='{.items[0].spec.targetGroupARN}' || true)
-            if [ -n "$TG_ARN" ]; then
-              aws elbv2 describe-target-health --target-group-arn "$TG_ARN" || true
-            fi
-            echo ""
-            echo "=== ALB HTTP RESPONSE TEST ==="
-            curl -Iv --max-time 10 http://k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com/grafana/ || true
-          } > diag.txt
-          cat diag.txt
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout -B diag
-          git add diag.txt
-          git commit -m "chore: cluster diagnostics dump [skip ci]" || true
-          git push -f origin diag || true
+          echo "=== PODS ==="
+          kubectl get pods -A
+          echo "=== INGRESSES ==="
+          kubectl get ingress -A
+          echo "=== ALB GRAFANA HEALTH ==="
+          curl -Iv --max-time 10 http://k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com/grafana/ || true
 
 
 

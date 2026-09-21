@@ -1,8 +1,10 @@
 # ==============================================================================
 # Helm Values for Grafana Loki (SingleBinary / Lightweight cluster mode)
+# Retention: 7h | Volume: 5Gi gp3 EBS
 # ==============================================================================
 
 deploymentMode: SingleBinary
+revision: "v2"
 
 loki:
   auth_enabled: false

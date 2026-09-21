@@ -49,8 +49,6 @@ jobs:
           aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
           terraform import kubernetes_storage_class_v1.gp3 gp3 || true
           kubectl set env daemonset aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true WARM_PREFIX_TARGET=1 || true
-          kubectl delete statefulset -n monitoring prometheus-kube-prometheus-stack-prometheus loki tempo --cascade=orphan || true
-          kubectl delete pod -n monitoring loki-0 tempo-0 prometheus-kube-prometheus-stack-prometheus-0 --force --grace-period=0 || true
 
       - name: Terraform Apply
         run: |
@@ -61,10 +59,15 @@ jobs:
         if: always()
         run: |
           aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
+          echo "Waiting 45 seconds for pod scheduling and PVC binding..."
+          sleep 45
           cd ..
           {
             echo "=== TERRAFORM OUTPUT (LAST 150 LINES) ==="
             cat /tmp/tf_apply.log | tail -n 150 || true
+            echo ""
+            echo "=== NODES ==="
+            kubectl get nodes -o wide || true
             echo ""
             echo "=== HELM RELEASES ==="
             helm list -A || true

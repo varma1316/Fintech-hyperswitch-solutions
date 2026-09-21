@@ -109,30 +109,6 @@ resource "helm_release" "aws_load_balancer_controller" {
 }
 
 # ------------------------------------------------------------------------------
-# 3b. Kubernetes StorageClass: gp3 (AWS EBS CSI Driver)
-# ------------------------------------------------------------------------------
-resource "kubernetes_storage_class_v1" "gp3" {
-  metadata {
-    name = "gp3"
-    annotations = {
-      "storageclass.kubernetes.io/is-default-class" = "true"
-    }
-  }
-
-  storage_provisioner    = "ebs.csi.aws.com"
-  volume_binding_mode    = "WaitForFirstConsumer"
-  allow_volume_expansion = true
-
-  parameters = {
-    type = "gp3"
-  }
-
-  depends_on = [
-    aws_eks_addon.ebs_csi
-  ]
-}
-
-# ------------------------------------------------------------------------------
 # 4. Helm Release: Kube Prometheus Stack (Prometheus & Grafana)
 # ------------------------------------------------------------------------------
 resource "helm_release" "kube_prometheus_stack" {
@@ -145,7 +121,6 @@ resource "helm_release" "kube_prometheus_stack" {
   wait             = false
   timeout          = 600
   cleanup_on_fail  = true
-  force_update     = true
 
   values = [
     file("${path.module}/../k8s/monitoring/kube-prometheus-stack-values.yaml")
@@ -154,8 +129,7 @@ resource "helm_release" "kube_prometheus_stack" {
   depends_on = [
     aws_eks_node_group.main,
     kubernetes_namespace.namespaces["monitoring"],
-    aws_eks_addon.ebs_csi,
-    kubernetes_storage_class_v1.gp3
+    aws_eks_addon.ebs_csi
   ]
 }
 
@@ -172,7 +146,6 @@ resource "helm_release" "loki" {
   wait             = false
   timeout          = 600
   cleanup_on_fail  = true
-  force_update     = true
 
   values = [
     file("${path.module}/../k8s/monitoring/loki-values.yaml")
@@ -181,8 +154,7 @@ resource "helm_release" "loki" {
   depends_on = [
     aws_eks_node_group.main,
     kubernetes_namespace.namespaces["monitoring"],
-    aws_eks_addon.ebs_csi,
-    kubernetes_storage_class_v1.gp3
+    aws_eks_addon.ebs_csi
   ]
 }
 
@@ -199,7 +171,6 @@ resource "helm_release" "tempo" {
   wait             = false
   timeout          = 600
   cleanup_on_fail  = true
-  force_update     = true
 
   values = [
     file("${path.module}/../k8s/monitoring/tempo-values.yaml")
@@ -208,8 +179,7 @@ resource "helm_release" "tempo" {
   depends_on = [
     aws_eks_node_group.main,
     kubernetes_namespace.namespaces["monitoring"],
-    aws_eks_addon.ebs_csi,
-    kubernetes_storage_class_v1.gp3
+    aws_eks_addon.ebs_csi
   ]
 }
 
@@ -226,7 +196,6 @@ resource "helm_release" "hyperswitch" {
   wait             = false
   timeout          = 600
   cleanup_on_fail  = true
-  force_update     = true
 
   values = [
     file("${path.module}/../k8s/hyperswitch/values.yaml")
@@ -267,6 +236,7 @@ resource "null_resource" "k8s_workloads" {
     command = <<-EOT
       aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}
       kubectl -n kube-system wait --for=condition=Available deployment/external-secrets-webhook --timeout=120s || sleep 15
+      kubectl apply -f ${path.module}/../k8s/monitoring/storageclass.yaml
       kubectl apply -f ${path.module}/../k8s/external-secrets/cluster-secret-store.yaml
       kubectl apply -f ${path.module}/../k8s/services/auth-service/
       kubectl apply -f ${path.module}/../k8s/services/cart-service/

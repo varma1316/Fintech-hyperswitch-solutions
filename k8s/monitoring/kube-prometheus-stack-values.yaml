@@ -67,3 +67,10 @@ nodeExporter:
 
 kubeStateMetrics:
   enabled: true
+
+prometheusOperator:
+  admissionWebhooks:
+    enabled: false
+    patch:
+      enabled: false
+

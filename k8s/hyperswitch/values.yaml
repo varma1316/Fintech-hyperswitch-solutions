@@ -44,6 +44,9 @@ redisMiscConfig:
     initContainer:
       enable: false
 
+initDB:
+  enable: false
+
 kafka:
   enabled: false
 

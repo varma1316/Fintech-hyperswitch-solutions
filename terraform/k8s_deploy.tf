@@ -216,12 +216,13 @@ resource "helm_release" "hyperswitch" {
 # ------------------------------------------------------------------------------
 resource "null_resource" "k8s_workloads" {
   triggers = {
-    manifest_hash = sha256(join("", [
+    manifest_hash            = sha256(join("", [
       file("${path.module}/../k8s/external-secrets/cluster-secret-store.yaml"),
       file("${path.module}/../k8s/ingress/alb-ingress.yaml")
     ]))
     kube_prometheus_stack_id = helm_release.kube_prometheus_stack.id
     hyperswitch_id           = helm_release.hyperswitch.id
+    lb_policy_hash           = sha256(file("${path.module}/aws_lb_controller_policy.json"))
   }
 
   provisioner "local-exec" {

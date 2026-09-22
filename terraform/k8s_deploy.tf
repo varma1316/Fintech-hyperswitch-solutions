@@ -218,15 +218,17 @@ resource "helm_release" "tempo" {
 # ------------------------------------------------------------------------------
 resource "null_resource" "hyperswitch_secrets" {
   triggers = {
-    db_host    = aws_db_instance.postgres.address
-    redis_host = aws_elasticache_cluster.redis.cache_nodes[0].address
-    pass_id    = random_password.db_password.id
-    admin_id   = random_password.hyperswitch_admin_key.id
-    jwt_id     = random_password.jwt_secret.id
+    db_host                 = aws_db_instance.postgres.address
+    redis_host              = aws_elasticache_cluster.redis.cache_nodes[0].address
+    pass_id                 = random_password.db_password.id
+    admin_id                = random_password.hyperswitch_admin_key.id
+    jwt_id                  = random_password.jwt_secret.id
+    hyperswitch_values_hash = sha256(file("${path.module}/../k8s/hyperswitch/values.yaml"))
   }
 
   provisioner "local-exec" {
     command = <<-EOT
+      set -euo pipefail
       aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}
       kubectl create secret generic hyperswitch-secrets \
         --namespace hyperswitch \
@@ -348,7 +350,10 @@ resource "null_resource" "k8s_workloads" {
       file("${path.module}/../k8s/ingress/alb-ingress.yaml")
     ]))
     kube_prometheus_stack_id = helm_release.kube_prometheus_stack.id
+    monitoring_values_hash   = sha256(file("${path.module}/../k8s/monitoring/kube-prometheus-stack-values.yaml"))
     hyperswitch_id           = helm_release.hyperswitch.id
+    hyperswitch_values_hash  = sha256(file("${path.module}/../k8s/hyperswitch/values.yaml"))
+    hyperswitch_secret_hash  = sha256(file("${path.module}/../k8s/hyperswitch/external-secret.yaml"))
     lb_policy_hash           = sha256(file("${path.module}/aws_lb_controller_policy.json"))
     services_hash            = sha256(join("", [
       file("${path.module}/../k8s/services/auth-service/deployment.yaml"),
@@ -362,6 +367,7 @@ resource "null_resource" "k8s_workloads" {
 
   provisioner "local-exec" {
     command = <<-EOT
+      set -euo pipefail
       aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}
       kubectl -n kube-system wait --for=condition=Available deployment/external-secrets-webhook --timeout=120s || sleep 15
       kubectl apply -f ${path.module}/../k8s/external-secrets/cluster-secret-store.yaml
@@ -385,4 +391,3 @@ resource "null_resource" "k8s_workloads" {
     kubernetes_namespace.namespaces
   ]
 }
-

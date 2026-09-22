@@ -8,6 +8,16 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
+# Keep the router workload bounded on the default EKS node group. The chart's
+# default HPA starts at three replicas, which can starve the monitoring stack
+# before the application has any traffic.
+# ------------------------------------------------------------------------------
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+
+# ------------------------------------------------------------------------------
 # Disable all sub-charts — AWS managed services are used instead
 # ------------------------------------------------------------------------------
 postgresql:
@@ -91,6 +101,12 @@ initDB:
 # hyperswitch-secrets instead of the non-existent 'clickhouse' secret.
 # ------------------------------------------------------------------------------
 server:
+  replicas: 1
+  serviceAccount:
+    # The chart default is a placeholder IRSA ARN. Hyperswitch uses the
+    # external AWS services through Kubernetes DNS and does not need that
+    # placeholder identity.
+    annotations: null
   configs:
     analytics:
       clickhouse:

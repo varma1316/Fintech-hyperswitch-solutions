@@ -3,12 +3,18 @@
 # Includes Prometheus, Alertmanager, Grafana, and preconfigured datasources
 # ==============================================================================
 
+crds:
+  enabled: true
+
 prometheus:
   prometheusSpec:
     serviceMonitorSelectorNilUsesHelmValues: false
     serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
     podMonitorSelectorNilUsesHelmValues: false
     podMonitorSelector: {}
+    podMonitorNamespaceSelector: {}
+    ruleNamespaceSelector: {}
     resources:
       requests:
         cpu: 200m
@@ -72,15 +78,57 @@ alertmanager:
         cpu: 200m
         memory: 256Mi
 
+# EKS manages the control plane, so these component endpoints are not
+# reachable from worker nodes. Disable their ServiceMonitors to avoid false
+# down targets while retaining API-server, kubelet, and node metrics.
+kubeControllerManager:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeProxy:
+  enabled: false
+
 nodeExporter:
   enabled: true
 
 kubeStateMetrics:
   enabled: true
 
+# Keep the auxiliary monitoring pods schedulable alongside the application
+# workloads on the default node group.
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
 prometheusOperator:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
   admissionWebhooks:
     enabled: false
     patch:
       enabled: false
-

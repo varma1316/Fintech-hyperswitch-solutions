@@ -227,6 +227,7 @@ resource "null_resource" "hyperswitch_secrets" {
   }
 
   provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
     command = <<-EOT
       set -euo pipefail
       aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}
@@ -366,6 +367,7 @@ resource "null_resource" "k8s_workloads" {
   }
 
   provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
     command = <<-EOT
       set -euo pipefail
       aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}

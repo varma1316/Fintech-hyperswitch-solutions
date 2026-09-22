@@ -27,6 +27,13 @@ externalPostgresql:
           key: DB_PASSWORD
   readOnly:
     enabled: false
+    auth:
+      username: "hyperswitch"
+      database: "hyperswitch_db"
+      password:
+        _secretRef:
+          name: hyperswitch-secrets
+          key: DB_PASSWORD
 
 redis:
   enabled: false

@@ -211,7 +211,61 @@ resource "helm_release" "tempo" {
 }
 
 # ------------------------------------------------------------------------------
-# 7. Helm Release: Hyperswitch Core Router
+# 7. Hyperswitch Kubernetes Secret (idempotent kubectl apply)
+#    Creates the secret before the Helm chart runs, using actual AWS endpoints.
+#    Uses --dry-run=client | kubectl apply to avoid "already exists" errors.
+#    ExternalSecret (applied in step 9) keeps it in sync with AWS Secrets Manager.
+# ------------------------------------------------------------------------------
+resource "null_resource" "hyperswitch_secrets" {
+  triggers = {
+    db_host    = aws_db_instance.postgres.address
+    redis_host = aws_elasticache_cluster.redis.cache_nodes[0].address
+    pass_id    = random_password.db_password.id
+    admin_id   = random_password.hyperswitch_admin_key.id
+    jwt_id     = random_password.jwt_secret.id
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}
+      kubectl create secret generic hyperswitch-secrets \
+        --namespace hyperswitch \
+        --from-literal=DB_HOST=$DB_HOST \
+        --from-literal=DB_PORT=$DB_PORT \
+        --from-literal=DB_NAME=$DB_NAME \
+        --from-literal=DB_USER=$DB_USER \
+        --from-literal=DB_PASSWORD=$DB_PASSWORD \
+        --from-literal=REDIS_HOST=$REDIS_HOST \
+        --from-literal=REDIS_PORT=6379 \
+        --from-literal=ADMIN_API_KEY=$ADMIN_API_KEY \
+        --from-literal=JWT_SECRET=$JWT_SECRET \
+        --dry-run=client -o yaml | kubectl apply -f -
+    EOT
+
+    environment = {
+      DB_HOST       = aws_db_instance.postgres.address
+      DB_PORT       = tostring(aws_db_instance.postgres.port)
+      DB_NAME       = aws_db_instance.postgres.db_name
+      DB_USER       = aws_db_instance.postgres.username
+      DB_PASSWORD   = random_password.db_password.result
+      REDIS_HOST    = aws_elasticache_cluster.redis.cache_nodes[0].address
+      ADMIN_API_KEY = random_password.hyperswitch_admin_key.result
+      JWT_SECRET    = random_password.jwt_secret.result
+    }
+  }
+
+  depends_on = [
+    kubernetes_namespace.namespaces["hyperswitch"],
+    aws_db_instance.postgres,
+    aws_elasticache_cluster.redis
+  ]
+}
+
+# ------------------------------------------------------------------------------
+# 8. Helm Release: Hyperswitch Core Router
+#    Dynamic infrastructure values (hosts, usernames, database names) are
+#    injected via "set" blocks from Terraform resource outputs, overriding
+#    the placeholder values in k8s/hyperswitch/values.yaml.
 # ------------------------------------------------------------------------------
 resource "helm_release" "hyperswitch" {
   name             = "hyperswitch"
@@ -228,9 +282,44 @@ resource "helm_release" "hyperswitch" {
     file("${path.module}/../k8s/hyperswitch/values.yaml")
   ]
 
+  # --- PostgreSQL Primary (AWS RDS) ---
+  set {
+    name  = "externalPostgresql.primary.host"
+    value = aws_db_instance.postgres.address
+  }
+  set {
+    name  = "externalPostgresql.primary.auth.username"
+    value = aws_db_instance.postgres.username
+  }
+  set {
+    name  = "externalPostgresql.primary.auth.database"
+    value = aws_db_instance.postgres.db_name
+  }
+
+  # --- PostgreSQL Read-Only (same RDS instance) ---
+  set {
+    name  = "externalPostgresql.readOnly.host"
+    value = aws_db_instance.postgres.address
+  }
+  set {
+    name  = "externalPostgresql.readOnly.auth.username"
+    value = aws_db_instance.postgres.username
+  }
+  set {
+    name  = "externalPostgresql.readOnly.auth.database"
+    value = aws_db_instance.postgres.db_name
+  }
+
+  # --- Redis (Amazon ElastiCache) ---
+  set {
+    name  = "externalRedis.host"
+    value = aws_elasticache_cluster.redis.cache_nodes[0].address
+  }
+
   depends_on = [
     aws_eks_node_group.main,
     kubernetes_namespace.namespaces["hyperswitch"],
+    null_resource.hyperswitch_secrets,
     helm_release.external_secrets,
     aws_db_instance.postgres,
     aws_elasticache_cluster.redis
@@ -238,7 +327,7 @@ resource "helm_release" "hyperswitch" {
 }
 
 # ------------------------------------------------------------------------------
-# 8. Kubernetes Workloads Deployment (ClusterSecretStore, Services, Ingress)
+# 9. Kubernetes Workloads Deployment (ClusterSecretStore, Services, Ingress)
 # ------------------------------------------------------------------------------
 resource "null_resource" "k8s_workloads" {
   triggers = {
@@ -263,7 +352,6 @@ resource "null_resource" "k8s_workloads" {
     command = <<-EOT
       aws eks update-kubeconfig --region ${var.aws_region} --name ${aws_eks_cluster.main.name}
       kubectl -n kube-system wait --for=condition=Available deployment/external-secrets-webhook --timeout=120s || sleep 15
-      kubectl apply -f ${path.module}/../k8s/monitoring/storageclass.yaml
       kubectl apply -f ${path.module}/../k8s/external-secrets/cluster-secret-store.yaml
       kubectl apply -f ${path.module}/../k8s/services/auth-service/
       kubectl apply -f ${path.module}/../k8s/services/cart-service/
@@ -285,3 +373,4 @@ resource "null_resource" "k8s_workloads" {
     kubernetes_namespace.namespaces
   ]
 }
+

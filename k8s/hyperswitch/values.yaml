@@ -1,73 +1,26 @@
 # ==============================================================================
-# Helm Values for Hyperswitch Core Router
-# Configured to utilize AWS RDS PostgreSQL and Amazon ElastiCache Redis
+# Helm Values for Hyperswitch Core Router (hyperswitch-app v1.3.1)
+# Configured to use AWS RDS PostgreSQL and Amazon ElastiCache Redis.
+#
+# IMPORTANT: Dynamic infrastructure values (hosts, usernames, database names)
+# are injected by Terraform "set" blocks in helm_release.hyperswitch.
+# The placeholder values below are overridden at deploy time.
 # ==============================================================================
 
-replicaCount: 1
-
-image:
-  repository: juspay/hyperswitch-router
-  pullPolicy: IfNotPresent
-  tag: "v1.115.0"
-
-# Disable sub-charts for PostgreSQL and Redis to use AWS Managed Services
+# ------------------------------------------------------------------------------
+# Disable all sub-charts — AWS managed services are used instead
+# ------------------------------------------------------------------------------
 postgresql:
   enabled: false
 
-externalPostgresql:
-  enabled: true
-  primary:
-    host: "hyperswitch-postgres"
-    auth:
-      username: "hyperswitch"
-      database: "hyperswitch_db"
-      password:
-        _secretRef:
-          name: hyperswitch-secrets
-          key: DB_PASSWORD
-  readOnly:
-    enabled: false
-    auth:
-      username: "hyperswitch"
-      database: "hyperswitch_db"
-      password:
-        _secretRef:
-          name: hyperswitch-secrets
-          key: DB_PASSWORD
-
 redis:
   enabled: false
-
-externalRedis:
-  enabled: true
-  host: "hyperswitch-redis"
-  auth:
-    enabled: false
-    username: ""
-    password: ""
-
-redisMiscConfig:
-  checkRedisIsUp:
-    initContainer:
-      enable: false
-
-initDB:
-  enable: false
 
 kafka:
   enabled: false
 
 clickhouse:
   enabled: false
-
-server:
-  configs:
-    analytics:
-      clickhouse:
-        password:
-          _secretRef:
-            name: hyperswitch-secrets
-            key: DB_PASSWORD
 
 mailhog:
   enabled: false
@@ -84,83 +37,64 @@ hyperswitch-card-vault:
 hyperswitch-ucs:
   enabled: false
 
-# External Secrets and Config Injection
-envFromSecrets:
-  - hyperswitch-secrets
+# ------------------------------------------------------------------------------
+# External PostgreSQL (AWS RDS)
+# Hosts and credentials are injected by Terraform set blocks.
+# Password is read from the hyperswitch-secrets Kubernetes Secret.
+# ------------------------------------------------------------------------------
+externalPostgresql:
+  enabled: true
+  primary:
+    host: "set-by-terraform"
+    auth:
+      username: "set-by-terraform"
+      database: "set-by-terraform"
+      password:
+        _secretRef:
+          name: hyperswitch-secrets
+          key: DB_PASSWORD
+  readOnly:
+    enabled: false
+    host: "set-by-terraform"
+    auth:
+      username: "set-by-terraform"
+      database: "set-by-terraform"
+      password:
+        _secretRef:
+          name: hyperswitch-secrets
+          key: DB_PASSWORD
 
-env:
-  - name: ROUTER__SERVER__HOST
-    value: "0.0.0.0"
-  - name: ROUTER__SERVER__PORT
-    value: "8080"
-  - name: ROUTER__DATABASE__HOST
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: DB_HOST
-  - name: ROUTER__DATABASE__PORT
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: DB_PORT
-  - name: ROUTER__DATABASE__USERNAME
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: DB_USER
-  - name: ROUTER__DATABASE__PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: DB_PASSWORD
-  - name: ROUTER__DATABASE__DB_NAME
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: DB_NAME
-  - name: ROUTER__REDIS__HOST
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: REDIS_HOST
-  - name: ROUTER__REDIS__PORT
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: REDIS_PORT
-  - name: ROUTER__SECRETS__ADMIN_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: ADMIN_API_KEY
-  - name: ROUTER__SECRETS__JWT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: hyperswitch-secrets
-        key: JWT_SECRET
+# ------------------------------------------------------------------------------
+# External Redis (Amazon ElastiCache)
+# Host is injected by Terraform set block.
+# ------------------------------------------------------------------------------
+externalRedis:
+  enabled: true
+  host: "set-by-terraform"
+  auth:
+    enabled: false
 
-service:
-  type: ClusterIP
-  port: 8080
+# ------------------------------------------------------------------------------
+# Initialization and Miscellaneous
+# ------------------------------------------------------------------------------
+redisMiscConfig:
+  checkRedisIsUp:
+    initContainer:
+      enable: false
 
-resources:
-  requests:
-    cpu: 250m
-    memory: 512Mi
-  limits:
-    cpu: 1000m
-    memory: 1024Mi
+initDB:
+  enable: false
 
-livenessProbe:
-  httpGet:
-    path: /health
-    port: 8080
-  initialDelaySeconds: 30
-  periodSeconds: 10
-
-readinessProbe:
-  httpGet:
-    path: /health
-    port: 8080
-  initialDelaySeconds: 15
-  periodSeconds: 5
+# ------------------------------------------------------------------------------
+# Server Configuration Overrides
+# Override chart default ClickHouse password secretRef to use our existing
+# hyperswitch-secrets instead of the non-existent 'clickhouse' secret.
+# ------------------------------------------------------------------------------
+server:
+  configs:
+    analytics:
+      clickhouse:
+        password:
+          _secretRef:
+            name: hyperswitch-secrets
+            key: DB_PASSWORD

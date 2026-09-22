@@ -46,10 +46,9 @@ jobs:
 
       - name: Terraform Apply
         run: |
+          # One-time state cleanup: detach the old kubernetes_secret resource
+          # (now replaced by idempotent null_resource.hyperswitch_secrets).
+          # Harmless no-op on subsequent runs.
+          terraform state rm kubernetes_secret.hyperswitch_secrets 2>/dev/null || true
           set -o pipefail
           terraform apply -auto-approve 2>&1 | tee /tmp/tf_apply.log
-
-
-
-
-

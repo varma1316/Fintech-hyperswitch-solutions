@@ -240,6 +240,18 @@ resource "null_resource" "hyperswitch_secrets" {
         --from-literal=ADMIN_API_KEY=$ADMIN_API_KEY \
         --from-literal=JWT_SECRET=$JWT_SECRET \
         --dry-run=client -o yaml | kubectl apply -f -
+
+      # Create ExternalName Services so hyperswitch-redis and hyperswitch-postgres
+      # resolve cleanly to AWS ElastiCache and RDS endpoints cluster-wide
+      kubectl create service externalname hyperswitch-redis \
+        --external-name=$REDIS_HOST \
+        --namespace hyperswitch \
+        --dry-run=client -o yaml | kubectl apply -f -
+
+      kubectl create service externalname hyperswitch-postgres \
+        --external-name=$DB_HOST \
+        --namespace hyperswitch \
+        --dry-run=client -o yaml | kubectl apply -f -
     EOT
 
     environment = {

@@ -45,20 +45,20 @@ hyperswitch-ucs:
 externalPostgresql:
   enabled: true
   primary:
-    host: "set-by-terraform"
+    host: "hyperswitch-postgres"
     auth:
-      username: "set-by-terraform"
-      database: "set-by-terraform"
+      username: "postgresadmin"
+      database: "hyperswitch"
       password:
         _secretRef:
           name: hyperswitch-secrets
           key: DB_PASSWORD
   readOnly:
     enabled: false
-    host: "set-by-terraform"
+    host: "hyperswitch-postgres"
     auth:
-      username: "set-by-terraform"
-      database: "set-by-terraform"
+      username: "postgresadmin"
+      database: "hyperswitch"
       password:
         _secretRef:
           name: hyperswitch-secrets
@@ -66,11 +66,11 @@ externalPostgresql:
 
 # ------------------------------------------------------------------------------
 # External Redis (Amazon ElastiCache)
-# Host is injected by Terraform set block.
+# Points to hyperswitch-redis ExternalName Kubernetes Service
 # ------------------------------------------------------------------------------
 externalRedis:
   enabled: true
-  host: "set-by-terraform"
+  host: "hyperswitch-redis"
   auth:
     enabled: false
 

@@ -108,9 +108,26 @@ server:
     # placeholder identity.
     annotations: null
   configs:
+    # Kafka is not deployed in this AWS stack. Use stdout for events so the
+    # router and consumer do not try to resolve the chart's kafka0 hostname.
+    events:
+      source: logs
+      kafka:
+        brokers: []
+    # The bundled Superposition service is disabled. Enable the chart's
+    # version-matched seed-file fallback so workloads can boot without it.
+    superposition:
+      endpoint: ""
+      org_id: hyperswitch
+      workspace_id: hyperswitch
+      token: "123456"
     analytics:
       clickhouse:
         password:
           _secretRef:
             name: hyperswitch-secrets
             key: DB_PASSWORD
+
+superpositionFallback:
+  enabled: true
+  source: fetch

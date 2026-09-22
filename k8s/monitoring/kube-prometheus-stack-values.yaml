@@ -121,6 +121,11 @@ kube-state-metrics:
 
 prometheusOperator:
   enabled: true
+  # Admission webhooks are disabled for this EKS deployment. Disable the
+  # operator's internal TLS as well, otherwise the deployment still mounts
+  # the admission secret and remains stuck in ContainerCreating.
+  tls:
+    enabled: false
   resources:
     requests:
       cpu: 50m

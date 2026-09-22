@@ -44,29 +44,11 @@ jobs:
           TF_BUCKET=$(echo -n "${{ secrets.TF_STATE_BUCKET }}" | tr -d '[:space:]')
           terraform init -backend-config="bucket=${TF_BUCKET}"
 
-      - name: Prepare Storage and StatefulSets
-        run: |
-          aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
-          terraform import kubernetes_storage_class_v1.gp3 gp3 || true
-          kubectl set env daemonset aws-node -n kube-system ENABLE_PREFIX_DELEGATION=true WARM_PREFIX_TARGET=1 || true
-
       - name: Terraform Apply
         run: |
           set -o pipefail
           terraform apply -auto-approve 2>&1 | tee /tmp/tf_apply.log
 
-      - name: Cluster Status Verification
-        if: always()
-        run: |
-          aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
-          echo "=== PODS ==="
-          kubectl get pods -A
-          echo ""
-          echo "=== PERSISTENT VOLUMES AND CLAIMS ==="
-          kubectl get pvc -A
-          echo ""
-          echo "=== ALB GRAFANA HEALTH ==="
-          curl -Iv --max-time 10 http://k8s-hyperswitchplatfo-e76b9467f2-2059119029.us-east-1.elb.amazonaws.com/grafana/ || true
 
 
 

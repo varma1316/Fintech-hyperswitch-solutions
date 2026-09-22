@@ -44,6 +44,12 @@ jobs:
           TF_BUCKET=$(echo -n "${{ secrets.TF_STATE_BUCKET }}" | tr -d '[:space:]')
           terraform init -backend-config="bucket=${TF_BUCKET}"
 
+      - name: Import Existing Resources
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name hyperswitch-cluster
+          terraform import kubernetes_storage_class_v1.gp3 gp3 || true
+          terraform import kubernetes_secret.hyperswitch_secrets hyperswitch/hyperswitch-secrets || true
+
       - name: Terraform Apply
         run: |
           set -o pipefail

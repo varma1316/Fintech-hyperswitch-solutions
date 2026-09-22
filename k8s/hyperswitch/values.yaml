@@ -60,6 +60,15 @@ kafka:
 clickhouse:
   enabled: false
 
+server:
+  configs:
+    analytics:
+      clickhouse:
+        password:
+          _secretRef:
+            name: hyperswitch-secrets
+            key: DB_PASSWORD
+
 mailhog:
   enabled: false
 

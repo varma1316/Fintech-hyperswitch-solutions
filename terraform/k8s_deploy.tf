@@ -211,7 +211,35 @@ resource "helm_release" "tempo" {
 }
 
 # ------------------------------------------------------------------------------
-# 7. Helm Release: Hyperswitch Core Router
+# 7. Hyperswitch Kubernetes Secret (Database & Redis credentials)
+# ------------------------------------------------------------------------------
+resource "kubernetes_secret" "hyperswitch_secrets" {
+  metadata {
+    name      = "hyperswitch-secrets"
+    namespace = "hyperswitch"
+  }
+
+  data = {
+    DB_HOST       = aws_db_instance.postgres.address
+    DB_PORT       = tostring(aws_db_instance.postgres.port)
+    DB_NAME       = aws_db_instance.postgres.db_name
+    DB_USER       = aws_db_instance.postgres.username
+    DB_PASSWORD   = random_password.db_password.result
+    REDIS_HOST    = aws_elasticache_cluster.redis.cache_nodes[0].address
+    REDIS_PORT    = "6379"
+    ADMIN_API_KEY = random_password.hyperswitch_admin_key.result
+    JWT_SECRET    = random_password.jwt_secret.result
+  }
+
+  depends_on = [
+    kubernetes_namespace.namespaces["hyperswitch"],
+    aws_db_instance.postgres,
+    aws_elasticache_cluster.redis
+  ]
+}
+
+# ------------------------------------------------------------------------------
+# 8. Helm Release: Hyperswitch Core Router
 # ------------------------------------------------------------------------------
 resource "helm_release" "hyperswitch" {
   name             = "hyperswitch"
@@ -231,6 +259,7 @@ resource "helm_release" "hyperswitch" {
   depends_on = [
     aws_eks_node_group.main,
     kubernetes_namespace.namespaces["hyperswitch"],
+    kubernetes_secret.hyperswitch_secrets,
     helm_release.external_secrets,
     aws_db_instance.postgres,
     aws_elasticache_cluster.redis
